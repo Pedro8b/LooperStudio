@@ -1,4 +1,7 @@
-﻿namespace LooperStudio
+﻿using System.Drawing;
+using System.Windows.Forms;
+
+namespace LooperStudio
 {
     partial class MainForm
     {
@@ -28,58 +31,198 @@
         /// </summary>
         private void InitializeComponent()
         {
-            Record = new Button();
-            Stop = new Button();
-            Play = new Button();
             SuspendLayout();
-            // 
-            // Record
-            // 
-            Record.Location = new Point(359, 47);
-            Record.Name = "Record";
-            Record.Size = new Size(75, 23);
-            Record.TabIndex = 0;
-            Record.Text = "Rec";
-            Record.UseVisualStyleBackColor = true;
-            Record.Click += Record_Click;
-            // 
-            // Stop
-            // 
-            Stop.Location = new Point(475, 47);
-            Stop.Name = "Stop";
-            Stop.Size = new Size(75, 23);
-            Stop.TabIndex = 1;
-            Stop.Text = "Stop";
-            Stop.UseVisualStyleBackColor = true;
-            Stop.Click += Stop_Click;
-            // 
-            // Play
-            // 
-            Play.Location = new Point(237, 47);
-            Play.Name = "Play";
-            Play.Size = new Size(75, 23);
-            Play.TabIndex = 2;
-            Play.Text = "Play";
-            Play.UseVisualStyleBackColor = true;
-            Play.Click += Play_Click;
+
             // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
-            Controls.Add(Play);
-            Controls.Add(Stop);
-            Controls.Add(Record);
+            ClientSize = new Size(1200, 700);
             Name = "MainForm";
-            Text = "Form1";
+            Text = "Looper Studio";
+
+            // Создаем все UI элементы
+            InitializeToolbar();
+            InitializeTimelinePanel();
+            InitializeSampleLibrary();
+
             ResumeLayout(false);
+        }
+
+        private void InitializeToolbar()
+        {
+            toolbar = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 50,
+                BackColor = Color.FromArgb(37, 37, 38)
+            };
+
+            // Кнопка воспроизведения
+            playButton = new Button
+            {
+                Text = "▶ Play",
+                Location = new Point(10, 10),
+                Size = new Size(80, 30),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White
+            };
+            playButton.Click += PlayButton_Click;
+            toolbar.Controls.Add(playButton);
+
+            // Кнопка остановки
+            stopButton = new Button
+            {
+                Text = "⬛ Stop",
+                Location = new Point(95, 10),
+                Size = new Size(80, 30),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White
+            };
+            stopButton.Click += StopButton_Click;
+            toolbar.Controls.Add(stopButton);
+
+            // Кнопка записи
+            recordButton = new Button
+            {
+                Text = "⏺ Record",
+                Location = new Point(180, 10),
+                Size = new Size(80, 30),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.Red
+            };
+            recordButton.Click += RecordButton_Click;
+            toolbar.Controls.Add(recordButton);
+
+            // Кнопка сохранения проекта
+            saveButton = new Button
+            {
+                Text = "💾 Save",
+                Location = new Point(300, 10),
+                Size = new Size(80, 30),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White
+            };
+            saveButton.Click += SaveButton_Click;
+            toolbar.Controls.Add(saveButton);
+
+            // Кнопка загрузки проекта
+            loadButton = new Button
+            {
+                Text = "📁 Load",
+                Location = new Point(385, 10),
+                Size = new Size(80, 30),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White
+            };
+            loadButton.Click += LoadButton_Click;
+            toolbar.Controls.Add(loadButton);
+
+            // Кнопка добавления семпла
+            addSampleButton = new Button
+            {
+                Text = "+ Add Sample",
+                Location = new Point(500, 10),
+                Size = new Size(100, 30),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White
+            };
+            addSampleButton.Click += AddSampleButton_Click;
+            toolbar.Controls.Add(addSampleButton);
+
+            // Кнопка настроек
+            settingsButton = new Button
+            {
+                Text = "⚙ Settings",
+                Location = new Point(620, 10),
+                Size = new Size(90, 30),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White
+            };
+            settingsButton.Click += SettingsButton_Click;
+            toolbar.Controls.Add(settingsButton);
+
+            this.Controls.Add(toolbar);
+        }
+
+        private void InitializeTimelinePanel()
+        {
+            timelinePanel = new Panel
+            {
+                Dock = DockStyle.Fill,
+                AutoScroll = true,
+                BackColor = Color.FromArgb(30, 30, 30),
+                Padding = new Padding(0, 0, 0, 0) // Убираем все отступы
+            };
+
+            this.Controls.Add(timelinePanel);
+        }
+
+        private void InitializeSampleLibrary()
+        {
+            libraryPanel = new Panel
+            {
+                Dock = DockStyle.Left,
+                Width = 250,
+                BackColor = Color.FromArgb(45, 45, 48),
+                BorderStyle = BorderStyle.FixedSingle
+            };
+
+            libraryLabel = new Label
+            {
+                Text = "Sample Library",
+                Dock = DockStyle.Top,
+                Height = 30,
+                ForeColor = Color.White,
+                TextAlign = ContentAlignment.MiddleCenter,
+                BackColor = Color.FromArgb(37, 37, 38),
+                Font = new Font("Segoe UI", 10, FontStyle.Bold)
+            };
+
+            sampleLibrary = new ListBox
+            {
+                Dock = DockStyle.Fill,
+                BackColor = Color.FromArgb(45, 45, 48),
+                ForeColor = Color.White,
+                BorderStyle = BorderStyle.None,
+                Font = new Font("Segoe UI", 9),
+                ItemHeight = 20,
+                IntegralHeight = false,
+                DrawMode = DrawMode.OwnerDrawFixed
+            };
+
+            sampleLibrary.DrawItem += SampleLibrary_DrawItem;
+            sampleLibrary.DoubleClick += SampleLibrary_DoubleClick;
+            sampleLibrary.MouseDown += SampleLibrary_MouseDown;
+
+            libraryPanel.Controls.Add(sampleLibrary);
+            libraryPanel.Controls.Add(libraryLabel);
+
+            this.Controls.Add(libraryPanel);
         }
 
         #endregion
 
-        private Button Record;
-        private Button Stop;
-        private Button Play;
+        // UI элементы
+        private Panel toolbar;
+        private Button playButton;
+        private Button stopButton;
+        private Button recordButton;
+        private Button saveButton;
+        private Button loadButton;
+        private Button addSampleButton;
+        private Button settingsButton;
+
+        private Panel timelinePanel;
+
+        private Panel libraryPanel;
+        private Label libraryLabel;
+        private ListBox sampleLibrary;
+
+        // Старые кнопки для совместимости (не используются)
+        private Button Record = new Button();
+        private Button Stop = new Button();
+        private Button Play = new Button();
     }
 }

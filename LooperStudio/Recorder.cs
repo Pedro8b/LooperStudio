@@ -11,47 +11,54 @@ namespace LooperStudio
 {
     public class Recorder
     {
+        private WaveFileWriter writer;
+        private WaveIn wave;
+        private string currentRecordingPath;
+
+        public string ProjectFolder { get; set; }
+        public string LastRecordedFile => currentRecordingPath;
+        public int InputDeviceNumber { get; set; } = 0;
+
         public Recorder()
-        { }
-        WaveFileWriter writer;
-        WaveIn wave;
+        {
+            // По умолчанию используем рабочий стол
+            ProjectFolder = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+        }
+
         public void Record()
         {
             try
             {
                 wave = new WaveIn();
-                wave.DeviceNumber = 0;
-                wave.WaveFormat = new WaveFormat(44100, 16, 1);
+                wave.DeviceNumber = InputDeviceNumber; // Используем выбранное устройство
+                wave.WaveFormat = new WaveFormat(44100, 16, 2); // Stereo для совместимости
                 wave.DataAvailable += Wave_DataAvailable;
                 wave.RecordingStopped += Wave_RecordingStopped;
-                string pathToDesktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-                string filePath = pathToDesktop + "/ExampleRecording.wav";
 
-                // Проверяем, не используется ли файл другим процессом
-                if (File.Exists(filePath))
+                // Создаем папку Recordings если её нет
+                string recordingsFolder = Path.Combine(ProjectFolder, "Recordings");
+                if (!Directory.Exists(recordingsFolder))
                 {
-                    try
-                    {
-                        using (var fileStream = File.Open(filePath, FileMode.Open, FileAccess.Read, FileShare.None))
-                        {
-                            fileStream.Close();
-                        }
-                        // Если файл не заблокирован, удаляем его
-                        File.Delete(filePath);
-                    }
-                    catch (IOException)
-                    {
-                        // Файл занят другим процессом - генерируем уникальное имя
-                        filePath = GetUniqueFilePath(filePath);
-                    }
+                    Directory.CreateDirectory(recordingsFolder);
                 }
 
-                writer = new WaveFileWriter(filePath, wave.WaveFormat);
+                // Генерируем уникальное имя файла с датой и временем
+                string fileName = $"Recording_{DateTime.Now:yyyy-MM-dd_HH-mm-ss}.wav";
+                currentRecordingPath = Path.Combine(recordingsFolder, fileName);
+
+                // Если файл существует, делаем уникальное имя
+                if (File.Exists(currentRecordingPath))
+                {
+                    currentRecordingPath = GetUniqueFilePath(currentRecordingPath);
+                }
+
+                writer = new WaveFileWriter(currentRecordingPath, wave.WaveFormat);
                 wave.StartRecording();
+
+                Console.WriteLine($"Запись начата: {currentRecordingPath}");
             }
             catch (Exception ex)
             {
-                // Логирование или обработка ошибки инициализации записи
                 Console.WriteLine($"Ошибка при запуске записи: {ex.Message}");
                 CleanupResources();
                 throw;
@@ -79,18 +86,19 @@ namespace LooperStudio
         {
             try
             {
-                if (wave != null)
+                if (wave != null && wave.WaveFormat != null)
                 {
                     wave.StopRecording();
+                    Console.WriteLine($"Запись остановлена: {currentRecordingPath}");
                 }
             }
             catch (Exception ex)
             {
-                // Логирование или обработка ошибки остановки записи
                 Console.WriteLine($"Ошибка при остановке записи: {ex.Message}");
                 throw;
             }
         }
+
         private void Wave_DataAvailable(object sender, WaveInEventArgs e)
         {
             try
@@ -98,14 +106,15 @@ namespace LooperStudio
                 if (writer != null)
                 {
                     writer.Write(e.Buffer, 0, e.BytesRecorded);
+                    writer.Flush();
                 }
             }
             catch (Exception ex)
             {
-                // Логирование или обработка ошибки записи данных
                 Console.WriteLine($"Ошибка при записи аудиоданных: {ex.Message}");
             }
         }
+
         private void Wave_RecordingStopped(object sender, StoppedEventArgs e)
         {
             try
@@ -118,7 +127,6 @@ namespace LooperStudio
             }
             catch (Exception ex)
             {
-                // Логирование или обработка ошибки освобождения ресурсов
                 Console.WriteLine($"Ошибка при освобождении ресурсов: {ex.Message}");
             }
             finally
