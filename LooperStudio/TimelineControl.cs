@@ -82,6 +82,14 @@ namespace LooperStudio
 
                     // Вычисляем позицию на таймлайне
                     double startTime = Math.Max(0, clientPoint.X / PixelsPerSecond);
+
+                    // Привязка к сетке
+                    if (project.SnapToGrid)
+                    {
+                        double gridSize = project.GetGridSize();
+                        startTime = Math.Round(startTime / gridSize) * gridSize;
+                    }
+
                     int trackNumber = Math.Max(0, Math.Min(project.TrackCount - 1,
                         (clientPoint.Y - TimelineHeaderHeight) / TrackHeight));
 
@@ -150,6 +158,12 @@ namespace LooperStudio
             // Рисуем треки
             DrawTracks(g);
 
+            // Рисуем сетку (если включена)
+            if (project.SnapToGrid)
+            {
+                DrawGrid(g);
+            }
+
             // Рисуем семплы
             DrawSamples(g);
         }
@@ -203,6 +217,42 @@ namespace LooperStudio
                 using (Font font = new Font("Segoe UI", 9))
                 {
                     g.DrawString($"Track {i + 1}", font, Brushes.Gray, 5, y + 5);
+                }
+            }
+        }
+
+        private void DrawGrid(Graphics g)
+        {
+            double gridSize = project.GetGridSize(); // Размер одной клетки сетки в секундах
+            int gridPixels = (int)(gridSize * PixelsPerSecond);
+
+            if (gridPixels < 5) return; // Не рисуем слишком мелкую сетку
+
+            using (Pen gridPen = new Pen(Color.FromArgb(80, 255, 255, 255), 1))
+            {
+                gridPen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dot;
+
+                int maxX = Width;
+                for (int x = 0; x < maxX; x += gridPixels)
+                {
+                    // Рисуем вертикальную линию
+                    g.DrawLine(gridPen, x, TimelineHeaderHeight, x, Height);
+                }
+            }
+
+            // Рисуем линии тактов (каждые 4 бита) более жирными
+            double barSize = (60.0 / project.BPM) * 4; // Длительность такта в секундах
+            int barPixels = (int)(barSize * PixelsPerSecond);
+
+            if (barPixels >= 10)
+            {
+                using (Pen barPen = new Pen(Color.FromArgb(120, 255, 255, 255), 2))
+                {
+                    int maxX = Width;
+                    for (int x = 0; x < maxX; x += barPixels)
+                    {
+                        g.DrawLine(barPen, x, TimelineHeaderHeight, x, Height);
+                    }
                 }
             }
         }
@@ -286,6 +336,14 @@ namespace LooperStudio
 
                 // Изменяем позицию по времени
                 double newStartTime = selectedSample.StartTime + (deltaX / PixelsPerSecond);
+
+                // Привязка к сетке
+                if (project.SnapToGrid)
+                {
+                    double gridSize = project.GetGridSize();
+                    newStartTime = Math.Round(newStartTime / gridSize) * gridSize;
+                }
+
                 if (newStartTime >= 0)
                 {
                     selectedSample.StartTime = newStartTime;

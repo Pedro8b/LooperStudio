@@ -57,9 +57,26 @@ namespace LooperStudio
             };
             timelinePanel.Controls.Add(timeline);
 
+            // Устанавливаем начальные значения в UI
+            bpmNumeric.Value = currentProject.BPM;
+            snapToGridCheckbox.Checked = currentProject.SnapToGrid;
+            UpdateGridDivisionFromProject();
+
             // Добавляем горячие клавиши
             this.KeyPreview = true;
             this.KeyDown += MainForm_KeyDown;
+        }
+
+        private void UpdateGridDivisionFromProject()
+        {
+            switch (currentProject.GridDivision)
+            {
+                case 4: gridDivisionCombo.SelectedIndex = 0; break;
+                case 8: gridDivisionCombo.SelectedIndex = 1; break;
+                case 16: gridDivisionCombo.SelectedIndex = 2; break;
+                case 32: gridDivisionCombo.SelectedIndex = 3; break;
+                default: gridDivisionCombo.SelectedIndex = 0; break;
+            }
         }
 
         // Обработчики кнопок
@@ -190,6 +207,31 @@ namespace LooperStudio
             }
         }
 
+        // Обработчики настроек сетки и BPM
+        private void BpmNumeric_ValueChanged(object sender, EventArgs e)
+        {
+            currentProject.BPM = (int)bpmNumeric.Value;
+            timeline.Invalidate(); // Перерисовываем сетку
+        }
+
+        private void SnapToGridCheckbox_CheckedChanged(object sender, EventArgs e)
+        {
+            currentProject.SnapToGrid = snapToGridCheckbox.Checked;
+            timeline.Invalidate(); // Перерисовываем сетку
+        }
+
+        private void GridDivisionCombo_SelectedIndexChanged(object sender, EventArgs e)
+        {
+            switch (gridDivisionCombo.SelectedIndex)
+            {
+                case 0: currentProject.GridDivision = 4; break;  // 1/4
+                case 1: currentProject.GridDivision = 8; break;  // 1/8
+                case 2: currentProject.GridDivision = 16; break; // 1/16
+                case 3: currentProject.GridDivision = 32; break; // 1/32
+            }
+            timeline.Invalidate(); // Перерисовываем сетку
+        }
+
         // Обработчики ListBox
         private void SampleLibrary_DrawItem(object sender, DrawItemEventArgs e)
         {
@@ -302,6 +344,5 @@ namespace LooperStudio
                 e.Handled = true;
             }
         }
-
     }
 }

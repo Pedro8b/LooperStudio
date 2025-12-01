@@ -143,6 +143,58 @@ namespace LooperStudio
             settingsButton.Click += SettingsButton_Click;
             toolbar.Controls.Add(settingsButton);
 
+            // === НАСТРОЙКИ СЕТКИ И BPM ===
+
+            // Label для BPM
+            var bpmLabel = new Label
+            {
+                Text = "BPM:",
+                Location = new Point(750, 15),
+                Size = new Size(40, 20),
+                ForeColor = Color.White
+            };
+            toolbar.Controls.Add(bpmLabel);
+
+            // NumericUpDown для BPM
+            bpmNumeric = new NumericUpDown
+            {
+                Location = new Point(790, 12),
+                Size = new Size(60, 25),
+                Minimum = 40,
+                Maximum = 300,
+                Value = 120,
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White
+            };
+            bpmNumeric.ValueChanged += BpmNumeric_ValueChanged;
+            toolbar.Controls.Add(bpmNumeric);
+
+            // CheckBox для Snap to Grid
+            snapToGridCheckbox = new CheckBox
+            {
+                Text = "Snap to Grid",
+                Location = new Point(870, 15),
+                Size = new Size(100, 20),
+                ForeColor = Color.White,
+                Checked = false
+            };
+            snapToGridCheckbox.CheckedChanged += SnapToGridCheckbox_CheckedChanged;
+            toolbar.Controls.Add(snapToGridCheckbox);
+
+            // ComboBox для Grid Division
+            gridDivisionCombo = new ComboBox
+            {
+                Location = new Point(980, 12),
+                Size = new Size(70, 25),
+                DropDownStyle = ComboBoxStyle.DropDownList,
+                BackColor = Color.FromArgb(60, 60, 60),
+                ForeColor = Color.White
+            };
+            gridDivisionCombo.Items.AddRange(new object[] { "1/4", "1/8", "1/16", "1/32" });
+            gridDivisionCombo.SelectedIndex = 0;
+            gridDivisionCombo.SelectedIndexChanged += GridDivisionCombo_SelectedIndexChanged;
+            toolbar.Controls.Add(gridDivisionCombo);
+
             this.Controls.Add(toolbar);
         }
 
@@ -189,7 +241,9 @@ namespace LooperStudio
                 Font = new Font("Segoe UI", 9),
                 ItemHeight = 20,
                 IntegralHeight = false,
-                DrawMode = DrawMode.OwnerDrawFixed
+                DrawMode = DrawMode.OwnerDrawFixed,
+                ScrollAlwaysVisible = false, // Скролл появляется автоматически
+                HorizontalScrollbar = false
             };
 
             sampleLibrary.DrawItem += SampleLibrary_DrawItem;
@@ -213,6 +267,9 @@ namespace LooperStudio
         private Button loadButton;
         private Button addSampleButton;
         private Button settingsButton;
+        private NumericUpDown bpmNumeric;
+        private CheckBox snapToGridCheckbox;
+        private ComboBox gridDivisionCombo;
 
         private Panel timelinePanel;
 
