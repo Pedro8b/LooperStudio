@@ -16,7 +16,7 @@ namespace LooperStudio
     {
         private Project project;
         private const int TrackHeight = 60;
-        private const int TimelineHeaderHeight = 30;
+        private const int TimelineHeaderHeight = 60;
         private const double PixelsPerSecond = 100; // Увеличиваем для точности (было 50)
         private AudioSample selectedSample = null;
         private bool isDragging = false;

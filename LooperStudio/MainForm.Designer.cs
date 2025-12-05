@@ -90,7 +90,7 @@ namespace LooperStudio
                 Location = new Point(180, 10),
                 Size = new Size(80, 30),
                 FlatStyle = FlatStyle.Flat,
-                ForeColor = Color.Red
+                ForeColor = Color.White
             };
             recordButton.Click += RecordButton_Click;
             toolbar.Controls.Add(recordButton);

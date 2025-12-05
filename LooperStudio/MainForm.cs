@@ -13,6 +13,7 @@ namespace LooperStudio
         private Project currentProject;
         private TimelineControl timeline;
         private string lastRecordedFile;
+        private bool Recording=false;
 
         public MainForm()
         {
@@ -93,8 +94,10 @@ namespace LooperStudio
             // Получаем путь к последнему записанному файлу
             lastRecordedFile = recordInstance.LastRecordedFile;
 
-            if (!string.IsNullOrEmpty(lastRecordedFile) && File.Exists(lastRecordedFile))
+            if (!string.IsNullOrEmpty(lastRecordedFile) && File.Exists(lastRecordedFile) && Recording)
             {
+                Recording = false;
+                recordButton.ForeColor = Color.White;
                 var result = MessageBox.Show(
                     "Запись завершена! Добавить в библиотеку семплов?",
                     "Запись завершена",
@@ -109,7 +112,9 @@ namespace LooperStudio
 
         private void RecordButton_Click(object sender, EventArgs e)
         {
+            Recording=true;
             recordInstance.Record();
+            recordButton.ForeColor = Color.Red;
             MessageBox.Show("Идет запись... Нажмите Stop для завершения.", "Запись");
         }
 
