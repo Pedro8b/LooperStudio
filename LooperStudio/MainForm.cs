@@ -1,7 +1,10 @@
 ﻿using NAudio.Wave;
+using NAudio.Wave.SampleProviders;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Linq;
 using System.Windows.Forms;
 
 namespace LooperStudio
@@ -13,7 +16,7 @@ namespace LooperStudio
         private Project currentProject;
         private TimelineControl timeline;
         private string lastRecordedFile;
-        private bool Recording=false;
+        private bool Recording = false;
 
         public MainForm()
         {
@@ -39,7 +42,18 @@ namespace LooperStudio
                 Directory.CreateDirectory(projectFolder);
             }
 
-            recordInstance.ProjectFolder = projectFolder;
+            // Устанавливаем папку семплов
+            if (string.IsNullOrEmpty(currentProject.SamplesFolder))
+            {
+                currentProject.SamplesFolder = Path.Combine(projectFolder, "Samples");
+            }
+
+            if (!Directory.Exists(currentProject.SamplesFolder))
+            {
+                Directory.CreateDirectory(currentProject.SamplesFolder);
+            }
+
+            recordInstance.ProjectFolder = currentProject.SamplesFolder;
 
             mixerEngine = new MixerEngine();
 
@@ -63,9 +77,49 @@ namespace LooperStudio
             snapToGridCheckbox.Checked = currentProject.SnapToGrid;
             UpdateGridDivisionFromProject();
 
+            // Загружаем семплы из папки
+            LoadSamplesFromFolder();
+
             // Добавляем горячие клавиши
             this.KeyPreview = true;
             this.KeyDown += MainForm_KeyDown;
+        }
+
+        private void LoadSamplesFromFolder()
+        {
+            if (string.IsNullOrEmpty(currentProject.SamplesFolder) || !Directory.Exists(currentProject.SamplesFolder))
+                return;
+
+            try
+            {
+                // Поддерживаемые форматы
+                string[] supportedExtensions = { "*.wav", "*.mp3", "*.aiff", "*.flac", "*.ogg" };
+
+                var audioFiles = new List<string>();
+
+                // Ищем файлы с поддерживаемыми расширениями
+                foreach (var extension in supportedExtensions)
+                {
+                    audioFiles.AddRange(Directory.GetFiles(currentProject.SamplesFolder, extension, SearchOption.AllDirectories));
+                }
+
+                // Добавляем в библиотеку
+                foreach (var filePath in audioFiles.OrderBy(f => Path.GetFileName(f)))
+                {
+                    if (!sampleLibrary.Items.Contains(filePath))
+                    {
+                        sampleLibrary.Items.Add(filePath);
+                    }
+                }
+
+                sampleLibrary.Refresh();
+
+                Debug.WriteLine($"Загружено {audioFiles.Count} семплов из папки {currentProject.SamplesFolder}");
+            }
+            catch (Exception ex)
+            {
+                Debug.WriteLine($"Ошибка загрузки семплов из папки: {ex.Message}");
+            }
         }
 
         private void UpdateGridDivisionFromProject()
@@ -89,33 +143,39 @@ namespace LooperStudio
         private void StopButton_Click(object sender, EventArgs e)
         {
             StopProject();
-            recordInstance.StopRecording();
-
-            // Получаем путь к последнему записанному файлу
-            lastRecordedFile = recordInstance.LastRecordedFile;
-
-            if (!string.IsNullOrEmpty(lastRecordedFile) && File.Exists(lastRecordedFile) && Recording)
-            {
-                Recording = false;
-                recordButton.ForeColor = Color.White;
-                var result = MessageBox.Show(
-                    "Запись завершена! Добавить в библиотеку семплов?",
-                    "Запись завершена",
-                    MessageBoxButtons.YesNo);
-
-                if (result == DialogResult.Yes)
-                {
-                    AddRecordedSampleToLibrary(lastRecordedFile);
-                }
-            }
         }
 
         private void RecordButton_Click(object sender, EventArgs e)
         {
-            Recording=true;
-            recordInstance.Record();
-            recordButton.ForeColor = Color.Red;
-            MessageBox.Show("Идет запись... Нажмите Stop для завершения.", "Запись");
+            if (!Recording)
+            {
+                Recording = true;
+                MessageBox.Show("Идет запись... Нажмите Record ещё раз для завершения.", "Запись");
+                recordInstance.Record();
+                recordButton.ForeColor = System.Drawing.Color.Red;
+            }
+            else
+            {
+                recordInstance.StopRecording();
+
+                // Получаем путь к последнему записанному файлу
+                lastRecordedFile = recordInstance.LastRecordedFile;
+
+                if (!string.IsNullOrEmpty(lastRecordedFile) && File.Exists(lastRecordedFile))
+                {
+                    Recording = false;
+                    recordButton.ForeColor = System.Drawing.Color.White;
+                    var result = MessageBox.Show(
+                        "Запись завершена! Добавить в библиотеку семплов?",
+                        "Запись завершена",
+                        MessageBoxButtons.YesNo);
+
+                    if (result == DialogResult.Yes)
+                    {
+                        AddRecordedSampleToLibrary(lastRecordedFile);
+                    }
+                }
+            }
         }
 
         private void SaveButton_Click(object sender, EventArgs e)
@@ -162,6 +222,25 @@ namespace LooperStudio
                         recordInstance.InputDeviceNumber = currentProject.InputDeviceNumber;
                         mixerEngine.SetOutputDevice(currentProject.OutputDeviceNumber);
 
+                        // Восстанавливаем папку семплов
+                        if (!string.IsNullOrEmpty(currentProject.SamplesFolder))
+                        {
+                            recordInstance.ProjectFolder = currentProject.SamplesFolder;
+                            if (!Directory.Exists(currentProject.SamplesFolder))
+                            {
+                                Directory.CreateDirectory(currentProject.SamplesFolder);
+                            }
+                        }
+
+                        // Обновляем UI
+                        bpmNumeric.Value = currentProject.BPM;
+                        snapToGridCheckbox.Checked = currentProject.SnapToGrid;
+                        UpdateGridDivisionFromProject();
+
+                        // Очищаем и перезагружаем библиотеку семплов
+                        sampleLibrary.Items.Clear();
+                        LoadSamplesFromFolder();
+
                         timeline.SetProject(currentProject);
                         this.Text = "Looper Studio - " + Path.GetFileNameWithoutExtension(openFileDialog.FileName);
                         MessageBox.Show("Проект успешно загружен!", "Загрузка");
@@ -199,7 +278,8 @@ namespace LooperStudio
         {
             using (var settingsForm = new SettingsForm(
                 recordInstance.InputDeviceNumber,
-                mixerEngine.OutputDeviceNumber))
+                mixerEngine.OutputDeviceNumber,
+                currentProject.SamplesFolder))
             {
                 if (settingsForm.ShowDialog() == DialogResult.OK)
                 {
@@ -207,7 +287,27 @@ namespace LooperStudio
                     recordInstance.InputDeviceNumber = settingsForm.SelectedInputDevice;
                     mixerEngine.SetOutputDevice(settingsForm.SelectedOutputDevice);
 
-                    MessageBox.Show("Настройки аудиоустройств сохранены!", "Настройки");
+                    // Проверяем изменилась ли папка семплов
+                    bool folderChanged = currentProject.SamplesFolder != settingsForm.SamplesFolder;
+
+                    // Сохраняем папку семплов
+                    currentProject.SamplesFolder = settingsForm.SamplesFolder;
+                    recordInstance.ProjectFolder = currentProject.SamplesFolder;
+
+                    // Создаём папку если её нет
+                    if (!Directory.Exists(currentProject.SamplesFolder))
+                    {
+                        Directory.CreateDirectory(currentProject.SamplesFolder);
+                    }
+
+                    // Если папка изменилась, перезагружаем семплы
+                    if (folderChanged)
+                    {
+                        sampleLibrary.Items.Clear();
+                        LoadSamplesFromFolder();
+                    }
+
+                    MessageBox.Show("Настройки сохранены!", "Настройки");
                 }
             }
         }
@@ -216,25 +316,25 @@ namespace LooperStudio
         private void BpmNumeric_ValueChanged(object sender, EventArgs e)
         {
             currentProject.BPM = (int)bpmNumeric.Value;
-            timeline.Invalidate(); // Перерисовываем сетку
+            timeline.Invalidate();
         }
 
         private void SnapToGridCheckbox_CheckedChanged(object sender, EventArgs e)
         {
             currentProject.SnapToGrid = snapToGridCheckbox.Checked;
-            timeline.Invalidate(); // Перерисовываем сетку
+            timeline.Invalidate();
         }
 
         private void GridDivisionCombo_SelectedIndexChanged(object sender, EventArgs e)
         {
             switch (gridDivisionCombo.SelectedIndex)
             {
-                case 0: currentProject.GridDivision = 4; break;  // 1/4
-                case 1: currentProject.GridDivision = 8; break;  // 1/8
-                case 2: currentProject.GridDivision = 16; break; // 1/16
-                case 3: currentProject.GridDivision = 32; break; // 1/32
+                case 0: currentProject.GridDivision = 4; break;
+                case 1: currentProject.GridDivision = 8; break;
+                case 2: currentProject.GridDivision = 16; break;
+                case 3: currentProject.GridDivision = 32; break;
             }
-            timeline.Invalidate(); // Перерисовываем сетку
+            timeline.Invalidate();
         }
 
         // Обработчики ListBox
@@ -328,6 +428,104 @@ namespace LooperStudio
             mixerEngine.Stop();
         }
 
+        private void ExportButton_Click(object sender, EventArgs e)
+        {
+            using (SaveFileDialog saveFileDialog = new SaveFileDialog())
+            {
+                saveFileDialog.Filter = "WAV Audio|*.wav|MP3 Audio|*.mp3";
+                saveFileDialog.DefaultExt = "wav";
+                saveFileDialog.FileName = currentProject.Name + "_export";
+
+                if (saveFileDialog.ShowDialog() == DialogResult.OK)
+                {
+                    try
+                    {
+                        string extension = Path.GetExtension(saveFileDialog.FileName).ToLower();
+
+                        if (extension == ".wav")
+                        {
+                            ExportToWav(saveFileDialog.FileName);
+                        }
+                        else if (extension == ".mp3")
+                        {
+                            MessageBox.Show("MP3 экспорт требует дополнительных кодеков (LAME).\nПока доступен только WAV экспорт.", "Информация");
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        MessageBox.Show($"Ошибка экспорта: {ex.Message}", "Ошибка");
+                    }
+                }
+            }
+        }
+
+        private void ExportToWav(string filePath)
+        {
+            if (currentProject.Samples.Count == 0)
+            {
+                MessageBox.Show("Нет семплов для экспорта!", "Ошибка");
+                return;
+            }
+
+            // Находим максимальное время
+            double maxTime = 0;
+            foreach (var sample in currentProject.Samples)
+            {
+                double endTime = sample.StartTime + sample.Duration;
+                if (endTime > maxTime)
+                    maxTime = endTime;
+            }
+
+            // Создаем микшер для рендеринга
+            var mixer = new MixingSampleProvider(WaveFormat.CreateIeeeFloatWaveFormat(44100, 2));
+            mixer.ReadFully = true;
+
+            // Загружаем все семплы
+            foreach (var sample in currentProject.Samples)
+            {
+                try
+                {
+                    var audioFile = new AudioFileReader(sample.FilePath);
+                    var resampler = new MediaFoundationResampler(audioFile,
+                        WaveFormat.CreateIeeeFloatWaveFormat(44100, 2));
+
+                    var volumeProvider = new VolumeSampleProvider(resampler.ToSampleProvider())
+                    {
+                        Volume = sample.Volume
+                    };
+
+                    var offsetProvider = new OffsetSampleProvider(volumeProvider)
+                    {
+                        DelayBy = TimeSpan.FromSeconds(sample.StartTime)
+                    };
+
+                    mixer.AddMixerInput(offsetProvider);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"Ошибка загрузки семпла {sample.Name}: {ex.Message}");
+                }
+            }
+
+            // Записываем в файл
+            int totalSamples = (int)(maxTime * 44100 * 2); // stereo
+
+            using (var writer = new WaveFileWriter(filePath, mixer.WaveFormat))
+            {
+                float[] buffer = new float[44100 * 2]; // 1 секунда буфер
+                int samplesRead;
+                int totalRead = 0;
+
+                while (totalRead < totalSamples && (samplesRead = mixer.Read(buffer, 0, buffer.Length)) > 0)
+                {
+                    writer.WriteSamples(buffer, 0, samplesRead);
+                    totalRead += samplesRead;
+                }
+            }
+
+            MessageBox.Show($"Проект успешно экспортирован!\n{filePath}", "Экспорт завершен");
+        }
+
         private void MainForm_KeyDown(object sender, KeyEventArgs e)
         {
             if (e.KeyCode == Keys.Space)
@@ -343,11 +541,32 @@ namespace LooperStudio
                 timeline.DeleteSelectedSample();
                 e.Handled = true;
             }
+            else if (e.Control && e.KeyCode == Keys.C)
+            {
+                timeline.CopySelectedSample();
+                e.Handled = true;
+            }
+            else if (e.Control && e.KeyCode == Keys.V)
+            {
+                timeline.PasteSample();
+                e.Handled = true;
+            }
             else if (e.Control && e.KeyCode == Keys.S)
             {
                 SaveButton_Click(sender, e);
                 e.Handled = true;
             }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                mixerEngine?.Dispose();
+                recordInstance = null;
+                components?.Dispose();
+            }
+            base.Dispose(disposing);
         }
     }
 }

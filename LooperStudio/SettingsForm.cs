@@ -8,13 +8,16 @@ namespace LooperStudio
     {
         public int SelectedInputDevice { get; private set; }
         public int SelectedOutputDevice { get; private set; }
+        public string SamplesFolder { get; private set; }
 
-        public SettingsForm(int currentInputDevice, int currentOutputDevice)
+        public SettingsForm(int currentInputDevice, int currentOutputDevice, string currentSamplesFolder)
         {
             InitializeComponent();
             SelectedInputDevice = currentInputDevice;
             SelectedOutputDevice = currentOutputDevice;
+            SamplesFolder = currentSamplesFolder;
             LoadAudioDevices();
+            samplesFolderTextBox.Text = SamplesFolder;
         }
 
         private void LoadAudioDevices()
@@ -56,8 +59,24 @@ namespace LooperStudio
                 SelectedOutputDevice = outputDeviceCombo.SelectedIndex;
             }
 
+            SamplesFolder = samplesFolderTextBox.Text;
+
             this.DialogResult = DialogResult.OK;
             this.Close();
+        }
+
+        private void BrowseFolderButton_Click(object sender, EventArgs e)
+        {
+            using (var folderDialog = new FolderBrowserDialog())
+            {
+                folderDialog.Description = "Выберите папку для семплов";
+                folderDialog.SelectedPath = SamplesFolder;
+
+                if (folderDialog.ShowDialog() == DialogResult.OK)
+                {
+                    samplesFolderTextBox.Text = folderDialog.SelectedPath;
+                }
+            }
         }
 
         private void CancelButton_Click(object sender, EventArgs e)
@@ -69,7 +88,7 @@ namespace LooperStudio
         private void InitializeComponent()
         {
             this.Text = "Settings";
-            this.Size = new System.Drawing.Size(450, 250);
+            this.Size = new System.Drawing.Size(450, 300);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
             this.MinimizeBox = false;
@@ -111,11 +130,38 @@ namespace LooperStudio
             };
             this.Controls.Add(outputDeviceCombo);
 
+            // Метка для папки семплов
+            var samplesFolderLabel = new Label
+            {
+                Text = "Samples Folder:",
+                Location = new System.Drawing.Point(20, 150),
+                Size = new System.Drawing.Size(200, 20)
+            };
+            this.Controls.Add(samplesFolderLabel);
+
+            // TextBox для папки семплов
+            samplesFolderTextBox = new TextBox
+            {
+                Location = new System.Drawing.Point(20, 175),
+                Size = new System.Drawing.Size(320, 25)
+            };
+            this.Controls.Add(samplesFolderTextBox);
+
+            // Кнопка Browse для выбора папки
+            browseFolderButton = new Button
+            {
+                Text = "Browse...",
+                Location = new System.Drawing.Point(350, 173),
+                Size = new System.Drawing.Size(70, 25)
+            };
+            browseFolderButton.Click += BrowseFolderButton_Click;
+            this.Controls.Add(browseFolderButton);
+
             // Кнопка Save
             saveButton = new Button
             {
                 Text = "Save",
-                Location = new System.Drawing.Point(245, 170),
+                Location = new System.Drawing.Point(245, 220),
                 Size = new System.Drawing.Size(80, 30)
             };
             saveButton.Click += SaveButton_Click;
@@ -125,7 +171,7 @@ namespace LooperStudio
             cancelButton = new Button
             {
                 Text = "Cancel",
-                Location = new System.Drawing.Point(340, 170),
+                Location = new System.Drawing.Point(340, 220),
                 Size = new System.Drawing.Size(80, 30)
             };
             cancelButton.Click += CancelButton_Click;
@@ -134,6 +180,8 @@ namespace LooperStudio
 
         private ComboBox inputDeviceCombo;
         private ComboBox outputDeviceCombo;
+        private TextBox samplesFolderTextBox;
+        private Button browseFolderButton;
         private Button saveButton;
         private Button cancelButton;
     }

@@ -17,10 +17,13 @@ namespace LooperStudio
         private Project project;
         private const int TrackHeight = 60;
         private const int TimelineHeaderHeight = 60;
-        private const double PixelsPerSecond = 100; // Увеличиваем для точности (было 50)
+        private const double PixelsPerSecond = 100;
         private AudioSample selectedSample = null;
         private bool isDragging = false;
         private Point dragStartPoint;
+        private double sampleStartTimeBeforeDrag;
+        private int sampleTrackBeforeDrag;
+        private AudioSample copiedSample = null; // Для Ctrl+C / Ctrl+V
 
         public event EventHandler<AudioSample> SampleSelected;
         public event EventHandler<AudioSample> SampleDoubleClicked;
@@ -29,21 +32,19 @@ namespace LooperStudio
         {
             DoubleBuffered = true;
             BackColor = Color.FromArgb(45, 45, 48);
-            AllowDrop = true; // Включаем поддержку drag & drop
+            AllowDrop = true;
 
             MouseDown += TimelineControl_MouseDown;
             MouseMove += TimelineControl_MouseMove;
             MouseUp += TimelineControl_MouseUp;
             MouseDoubleClick += TimelineControl_MouseDoubleClick;
 
-            // Drag & Drop события
             DragEnter += TimelineControl_DragEnter;
             DragDrop += TimelineControl_DragDrop;
         }
 
         private void TimelineControl_DragEnter(object sender, DragEventArgs e)
         {
-            // Проверяем, что перетаскивается текст (путь к файлу)
             if (e.Data.GetDataPresent(DataFormats.Text) ||
                 e.Data.GetDataPresent(DataFormats.FileDrop))
             {
@@ -61,7 +62,6 @@ namespace LooperStudio
             {
                 string filePath = null;
 
-                // Получаем путь к файлу
                 if (e.Data.GetDataPresent(DataFormats.Text))
                 {
                     filePath = e.Data.GetData(DataFormats.Text) as string;
@@ -77,13 +77,10 @@ namespace LooperStudio
 
                 if (!string.IsNullOrEmpty(filePath) && File.Exists(filePath))
                 {
-                    // Конвертируем координаты экрана в координаты контрола
                     Point clientPoint = PointToClient(new Point(e.X, e.Y));
 
-                    // Вычисляем позицию на таймлайне
                     double startTime = Math.Max(0, clientPoint.X / PixelsPerSecond);
 
-                    // Привязка к сетке
                     if (project.SnapToGrid)
                     {
                         double gridSize = project.GetGridSize();
@@ -93,7 +90,6 @@ namespace LooperStudio
                     int trackNumber = Math.Max(0, Math.Min(project.TrackCount - 1,
                         (clientPoint.Y - TimelineHeaderHeight) / TrackHeight));
 
-                    // Получаем длительность файла
                     using (var audioFile = new AudioFileReader(filePath))
                     {
                         double duration = audioFile.TotalTime.TotalSeconds;
@@ -130,8 +126,7 @@ namespace LooperStudio
         {
             if (project == null) return;
 
-            // Вычисляем минимальную ширину на основе самого длинного семпла
-            double maxTime = 30; // Минимум 30 секунд
+            double maxTime = 30;
             foreach (var sample in project.Samples)
             {
                 double endTime = sample.StartTime + sample.Duration;
@@ -152,29 +147,22 @@ namespace LooperStudio
             Graphics g = e.Graphics;
             g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
 
-            // Рисуем заголовок временной шкалы
             DrawTimelineHeader(g);
-
-            // Рисуем треки
             DrawTracks(g);
 
-            // Рисуем сетку (если включена)
             if (project.SnapToGrid)
             {
                 DrawGrid(g);
             }
 
-            // Рисуем семплы
             DrawSamples(g);
         }
 
         private void DrawTimelineHeader(Graphics g)
         {
-            // Фон заголовка
             g.FillRectangle(new SolidBrush(Color.FromArgb(37, 37, 38)),
                 0, 0, Width, TimelineHeaderHeight);
 
-            // Временные метки (каждую секунду)
             using (Font font = new Font("Segoe UI", 8))
             {
                 int secondsToShow = (int)(Width / PixelsPerSecond) + 1;
@@ -182,11 +170,9 @@ namespace LooperStudio
                 {
                     int x = (int)(i * PixelsPerSecond);
 
-                    // Длинная линия каждую секунду
                     g.DrawLine(Pens.LightGray, x, TimelineHeaderHeight - 8, x, TimelineHeaderHeight);
                     g.DrawString($"{i}s", font, Brushes.LightGray, x + 2, 5);
 
-                    // Короткие линии каждые 0.5 секунды
                     if (i < secondsToShow - 1)
                     {
                         int halfX = (int)((i + 0.5) * PixelsPerSecond);
@@ -202,18 +188,15 @@ namespace LooperStudio
             {
                 int y = TimelineHeaderHeight + (i * TrackHeight);
 
-                // Чередующиеся цвета треков
                 Color trackColor = i % 2 == 0
                     ? Color.FromArgb(50, 50, 52)
                     : Color.FromArgb(45, 45, 48);
 
                 g.FillRectangle(new SolidBrush(trackColor), 0, y, Width, TrackHeight);
 
-                // Линия разделения
                 g.DrawLine(new Pen(Color.FromArgb(60, 60, 60)),
                     0, y, Width, y);
 
-                // Номер трека
                 using (Font font = new Font("Segoe UI", 9))
                 {
                     g.DrawString($"Track {i + 1}", font, Brushes.Gray, 5, y + 5);
@@ -223,10 +206,10 @@ namespace LooperStudio
 
         private void DrawGrid(Graphics g)
         {
-            double gridSize = project.GetGridSize(); // Размер одной клетки сетки в секундах
+            double gridSize = project.GetGridSize();
             int gridPixels = (int)(gridSize * PixelsPerSecond);
 
-            if (gridPixels < 5) return; // Не рисуем слишком мелкую сетку
+            if (gridPixels < 5) return;
 
             using (Pen gridPen = new Pen(Color.FromArgb(80, 255, 255, 255), 1))
             {
@@ -235,13 +218,11 @@ namespace LooperStudio
                 int maxX = Width;
                 for (int x = 0; x < maxX; x += gridPixels)
                 {
-                    // Рисуем вертикальную линию
                     g.DrawLine(gridPen, x, TimelineHeaderHeight, x, Height);
                 }
             }
 
-            // Рисуем линии тактов (каждые 4 бита) более жирными
-            double barSize = (60.0 / project.BPM) * 4; // Длительность такта в секундах
+            double barSize = (60.0 / project.BPM) * 4;
             int barPixels = (int)(barSize * PixelsPerSecond);
 
             if (barPixels >= 10)
@@ -272,22 +253,18 @@ namespace LooperStudio
             int width = (int)(sample.Duration * PixelsPerSecond);
             int height = TrackHeight - 10;
 
-            // Цвет семпла
             Color sampleColor = isSelected
                 ? Color.FromArgb(0, 122, 204)
                 : Color.FromArgb(70, 130, 180);
 
-            // Рисуем прямоугольник семпла
             g.FillRectangle(new SolidBrush(sampleColor), x, y, width, height);
             g.DrawRectangle(new Pen(Color.White, isSelected ? 2 : 1), x, y, width, height);
 
-            // Название семпла
             using (Font font = new Font("Segoe UI", 8, FontStyle.Bold))
             {
                 g.DrawString(sample.Name, font, Brushes.White, x + 5, y + 5);
             }
 
-            // Показываем длительность крупно для понимания масштаба
             using (Font font = new Font("Segoe UI", 9, FontStyle.Bold))
             {
                 string durationText = $"{sample.Duration:F2}s";
@@ -296,7 +273,6 @@ namespace LooperStudio
                     x + (width / 2) - (textSize.Width / 2), y + (height / 2) - (textSize.Height / 2));
             }
 
-            // Индикатор громкости
             using (Font font = new Font("Segoe UI", 7))
             {
                 g.DrawString($"Vol: {(int)(sample.Volume * 100)}%", font,
@@ -315,6 +291,10 @@ namespace LooperStudio
                     selectedSample = clickedSample;
                     isDragging = true;
                     dragStartPoint = e.Location;
+
+                    sampleStartTimeBeforeDrag = selectedSample.StartTime;
+                    sampleTrackBeforeDrag = selectedSample.TrackNumber;
+
                     SampleSelected?.Invoke(this, selectedSample);
                     Invalidate();
                 }
@@ -330,14 +310,11 @@ namespace LooperStudio
         {
             if (isDragging && selectedSample != null)
             {
-                // Перемещение семпла
-                int deltaX = e.X - dragStartPoint.X;
-                int deltaY = e.Y - dragStartPoint.Y;
+                int totalDeltaX = e.X - dragStartPoint.X;
+                int totalDeltaY = e.Y - dragStartPoint.Y;
 
-                // Изменяем позицию по времени
-                double newStartTime = selectedSample.StartTime + (deltaX / PixelsPerSecond);
+                double newStartTime = sampleStartTimeBeforeDrag + (totalDeltaX / PixelsPerSecond);
 
-                // Привязка к сетке
                 if (project.SnapToGrid)
                 {
                     double gridSize = project.GetGridSize();
@@ -349,15 +326,13 @@ namespace LooperStudio
                     selectedSample.StartTime = newStartTime;
                 }
 
-                // Изменяем трек
-                int trackDelta = deltaY / TrackHeight;
-                int newTrack = selectedSample.TrackNumber + trackDelta;
+                int trackDelta = totalDeltaY / TrackHeight;
+                int newTrack = sampleTrackBeforeDrag + trackDelta;
                 if (newTrack >= 0 && newTrack < project.TrackCount)
                 {
                     selectedSample.TrackNumber = newTrack;
                 }
 
-                dragStartPoint = e.Location;
                 Invalidate();
             }
         }
@@ -380,7 +355,6 @@ namespace LooperStudio
         {
             if (project == null) return null;
 
-            // Проверяем в обратном порядке (последние нарисованные сверху)
             for (int i = project.Samples.Count - 1; i >= 0; i--)
             {
                 var sample = project.Samples[i];
@@ -405,6 +379,43 @@ namespace LooperStudio
             {
                 project.Samples.Remove(selectedSample);
                 selectedSample = null;
+                Invalidate();
+            }
+        }
+
+        public void CopySelectedSample()
+        {
+            if (selectedSample != null)
+            {
+                copiedSample = new AudioSample
+                {
+                    FilePath = selectedSample.FilePath,
+                    Name = selectedSample.Name,
+                    Duration = selectedSample.Duration,
+                    Volume = selectedSample.Volume,
+                    StartTime = selectedSample.StartTime,
+                    TrackNumber = selectedSample.TrackNumber
+                };
+            }
+        }
+
+        public void PasteSample()
+        {
+            if (copiedSample != null && project != null)
+            {
+                var newSample = new AudioSample
+                {
+                    FilePath = copiedSample.FilePath,
+                    Name = copiedSample.Name,
+                    Duration = copiedSample.Duration,
+                    Volume = copiedSample.Volume,
+                    StartTime = copiedSample.StartTime + 1.0,
+                    TrackNumber = copiedSample.TrackNumber
+                };
+
+                project.Samples.Add(newSample);
+                selectedSample = newSample;
+                UpdateSize();
                 Invalidate();
             }
         }

@@ -20,6 +20,9 @@ namespace LooperStudio
         public int InputDeviceNumber { get; set; } = 0;
         public int OutputDeviceNumber { get; set; } = 0;
 
+        // Папка семплов
+        public string SamplesFolder { get; set; } = "";
+
         // Настройки сетки
         public bool SnapToGrid { get; set; } = false;
         public int GridDivision { get; set; } = 4; // 1/4 ноты (четвертные)

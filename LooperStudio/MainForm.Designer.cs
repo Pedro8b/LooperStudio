@@ -13,15 +13,6 @@ namespace LooperStudio
         /// <summary>
         ///  Clean up any resources being used.
         /// </summary>
-        /// <param name="disposing">true if managed resources should be disposed; otherwise, false.</param>
-        protected override void Dispose(bool disposing)
-        {
-            if (disposing && (components != null))
-            {
-                components.Dispose();
-            }
-            base.Dispose(disposing);
-        }
 
         #region Windows Form Designer generated code
 
@@ -143,13 +134,25 @@ namespace LooperStudio
             settingsButton.Click += SettingsButton_Click;
             toolbar.Controls.Add(settingsButton);
 
+            // Кнопка экспорта
+            exportButton = new Button
+            {
+                Text = "📤 Export",
+                Location = new Point(720, 10),
+                Size = new Size(80, 30),
+                FlatStyle = FlatStyle.Flat,
+                ForeColor = Color.White
+            };
+            exportButton.Click += ExportButton_Click;
+            toolbar.Controls.Add(exportButton);
+
             // === НАСТРОЙКИ СЕТКИ И BPM ===
 
             // Label для BPM
             var bpmLabel = new Label
             {
                 Text = "BPM:",
-                Location = new Point(750, 15),
+                Location = new Point(820, 15),
                 Size = new Size(40, 20),
                 ForeColor = Color.White
             };
@@ -158,7 +161,7 @@ namespace LooperStudio
             // NumericUpDown для BPM
             bpmNumeric = new NumericUpDown
             {
-                Location = new Point(790, 12),
+                Location = new Point(860, 12),
                 Size = new Size(60, 25),
                 Minimum = 40,
                 Maximum = 300,
@@ -173,7 +176,7 @@ namespace LooperStudio
             snapToGridCheckbox = new CheckBox
             {
                 Text = "Snap to Grid",
-                Location = new Point(870, 15),
+                Location = new Point(940, 15),
                 Size = new Size(100, 20),
                 ForeColor = Color.White,
                 Checked = false
@@ -184,7 +187,7 @@ namespace LooperStudio
             // ComboBox для Grid Division
             gridDivisionCombo = new ComboBox
             {
-                Location = new Point(980, 12),
+                Location = new Point(1050, 12),
                 Size = new Size(70, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(60, 60, 60),
@@ -267,6 +270,7 @@ namespace LooperStudio
         private Button loadButton;
         private Button addSampleButton;
         private Button settingsButton;
+        private Button exportButton;
         private NumericUpDown bpmNumeric;
         private CheckBox snapToGridCheckbox;
         private ComboBox gridDivisionCombo;
