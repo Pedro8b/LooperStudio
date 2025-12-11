@@ -115,7 +115,7 @@ namespace LooperStudio
                 Debug.WriteLine($"=== ПЛАНИРОВАНИЕ СЕМПЛА ===");
                 Debug.WriteLine($"Имя: {sample.Name}");
                 Debug.WriteLine($"Должен начаться в: {sample.StartTime}s");
-                Debug.WriteLine($"Длительность: {sample.Duration}s");
+                Debug.WriteLine($"Длительность семпла: {sample.Duration}s");
 
                 // Загружаем аудиофайл
                 var audioFile = new AudioFileReader(sample.FilePath);
@@ -125,8 +125,16 @@ namespace LooperStudio
                 // Конвертируем в нужный формат (44.1kHz stereo)
                 var resampler = new MediaFoundationResampler(audioFile, WaveFormat.CreateIeeeFloatWaveFormat(44100, 2));
 
+                // ИСПРАВЛЕНИЕ: Пропускаем начало файла (если FileOffset > 0) и ограничиваем длительность
+                var skipTakeProvider = new SkipTakeSampleProvider(
+                    resampler.ToSampleProvider(),
+                    TimeSpan.FromSeconds(sample.FileOffset),
+                    TimeSpan.FromSeconds(sample.Duration));
+
+                Debug.WriteLine($"FileOffset: {sample.FileOffset}s, Duration: {sample.Duration}s");
+
                 // Применяем громкость
-                var volumeProvider = new VolumeSampleProvider(resampler.ToSampleProvider())
+                var volumeProvider = new VolumeSampleProvider(skipTakeProvider)
                 {
                     Volume = sample.Volume
                 };
@@ -137,7 +145,7 @@ namespace LooperStudio
                     DelayBy = TimeSpan.FromSeconds(sample.StartTime)
                 };
 
-                Debug.WriteLine($"Установлена задержка: {sample.StartTime}s ({TimeSpan.FromSeconds(sample.StartTime)})");
+                Debug.WriteLine($"Установлена задержка: {sample.StartTime}s");
 
                 // Добавляем в микшер
                 mixer.AddMixerInput(offsetProvider);
@@ -200,6 +208,62 @@ namespace LooperStudio
             playbackTimer?.Dispose();
             outputDevice?.Dispose();
             activeSounds.Clear();
+        }
+    }
+
+    /// <summary>
+    /// Sample provider с пропуском начала и ограничением длительности
+    /// </summary>
+    public class SkipTakeSampleProvider : ISampleProvider
+    {
+        private readonly ISampleProvider sourceProvider;
+        private long samplesToSkip;
+        private long samplesRemaining;
+        private bool skipped = false;
+
+        public WaveFormat WaveFormat => sourceProvider.WaveFormat;
+
+        public SkipTakeSampleProvider(ISampleProvider source, TimeSpan skipDuration, TimeSpan takeDuration)
+        {
+            sourceProvider = source;
+            samplesToSkip = (long)(skipDuration.TotalSeconds * WaveFormat.SampleRate * WaveFormat.Channels);
+            samplesRemaining = (long)(takeDuration.TotalSeconds * WaveFormat.SampleRate * WaveFormat.Channels);
+
+            Debug.WriteLine($"SkipTakeSampleProvider: Skip={skipDuration.TotalSeconds}s, Take={takeDuration.TotalSeconds}s");
+        }
+
+        public int Read(float[] buffer, int offset, int count)
+        {
+            // Сначала пропускаем начало файла
+            if (!skipped && samplesToSkip > 0)
+            {
+                float[] skipBuffer = new float[WaveFormat.SampleRate * WaveFormat.Channels]; // 1 секунда буфер
+                long remaining = samplesToSkip;
+
+                while (remaining > 0)
+                {
+                    int toRead = (int)Math.Min(skipBuffer.Length, remaining);
+                    int read = sourceProvider.Read(skipBuffer, 0, toRead);
+                    if (read == 0) break; // Достигли конца файла
+                    remaining -= read;
+                }
+
+                skipped = true;
+                Debug.WriteLine($"SkipTakeSampleProvider: Пропущено {samplesToSkip} семплов");
+            }
+
+            if (samplesRemaining <= 0)
+            {
+                return 0; // Достигли конца заданной длительности
+            }
+
+            // Читаем не больше, чем осталось
+            int samplesToRead = (int)Math.Min(count, samplesRemaining);
+            int samplesRead = sourceProvider.Read(buffer, offset, samplesToRead);
+
+            samplesRemaining -= samplesRead;
+
+            return samplesRead;
         }
     }
 
@@ -309,6 +373,7 @@ namespace LooperStudio
             position = 0;
         }
     }
+
     public class SampleManager
     {
 

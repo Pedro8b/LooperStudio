@@ -422,46 +422,62 @@ namespace LooperStudio
                 MessageBox.Show($"Ошибка добавления семпла: {ex.Message}", "Ошибка");
             }
         }
-         private void SplitSample(AudioSample original, double splitTime)
-            {
-            Debug.WriteLine(splitTime);
-            Debug.WriteLine(original.Duration / splitTime);
-            if (splitTime <= 0 || original.Duration*splitTime >= original.Duration)
-            {
-                MessageBox.Show("Выберите значения между 0 и 8", "Ошибка");
-            }
-            else
-            {
-                double StartTime1 = original.StartTime;
-                double StartTime2 = original.StartTime + splitTime*original.Duration;
-                double Duration1 = original.Duration - splitTime*original.Duration;
-                double Duration2 = splitTime * original.Duration;
+        private void SplitSample(AudioSample original, double splitTime)
+        {
+            Debug.WriteLine($"=== РАЗДЕЛЕНИЕ СЕМПЛА ===");
+            Debug.WriteLine($"Оригинальный семпл: {original.Name}");
+            Debug.WriteLine($"FileOffset: {original.FileOffset}");
+            Debug.WriteLine($"Duration: {original.Duration}");
+            Debug.WriteLine($"Split position: {splitTime}");
 
-                // 3. Создание первой части (копируем и корректируем)
-
-                var sample1 = new AudioSample
-                {
-                    FilePath = original.FilePath,
-                    Name = original.Name + " - Chop_1",
-                    StartTime = StartTime1,
-                    TrackNumber = original.TrackNumber,
-                    Duration = Duration1
-                };
-                currentProject.Samples.Add(sample1);
-                timeline.SetProject(currentProject);
-                var sample2 = new AudioSample
-                {
-                    FilePath = original.FilePath,
-                    Name = original.Name + " - Chop_2",
-                    StartTime = StartTime2,
-                    TrackNumber = original.TrackNumber,
-                    Duration = Duration2
-                };
-                timeline.AddSample(sample1);
-                timeline.AddSample(sample2);
-                timeline.DeleteSample(original);
+            if (splitTime <= 0 || splitTime >= 1)
+            {
+                MessageBox.Show("Выберите значение между 1 и 7", "Ошибка");
+                return;
             }
-         }
+
+            double splitPointInSample = splitTime * original.Duration;
+
+            Debug.WriteLine($"Split point in sample: {splitPointInSample}s");
+
+            double duration1 = splitPointInSample;
+            double fileOffset1 = original.FileOffset;
+
+            double duration2 = original.Duration - splitPointInSample;
+            double fileOffset2 = original.FileOffset + splitPointInSample;
+
+            Debug.WriteLine($"Часть 1: FileOffset={fileOffset1}s, Duration={duration1}s");
+            Debug.WriteLine($"Часть 2: FileOffset={fileOffset2}s, Duration={duration2}s");
+
+            var sample1 = new AudioSample
+            {
+                FilePath = original.FilePath,
+                Name = original.Name + "_Part1",
+                StartTime = original.StartTime,
+                TrackNumber = original.TrackNumber,
+                Duration = duration1,
+                Volume = original.Volume,
+                FileOffset = fileOffset1
+            };
+
+            // 4. Создаём вторую часть
+            var sample2 = new AudioSample
+            {
+                FilePath = original.FilePath,
+                Name = original.Name + "_Part2",
+                StartTime = original.StartTime + duration1,
+                TrackNumber = original.TrackNumber,
+                Duration = duration2,
+                Volume = original.Volume,
+                FileOffset = fileOffset2
+            };
+
+            timeline.DeleteSample(original);
+            timeline.AddSample(sample1);
+            timeline.AddSample(sample2);
+
+            Debug.WriteLine("=== РАЗДЕЛЕНИЕ ЗАВЕРШЕНО ===");
+        }
 
         private void PlayProject()
         {
@@ -541,7 +557,13 @@ namespace LooperStudio
                     var resampler = new MediaFoundationResampler(audioFile,
                         WaveFormat.CreateIeeeFloatWaveFormat(44100, 2));
 
-                    var volumeProvider = new VolumeSampleProvider(resampler.ToSampleProvider())
+                    // Учитываем FileOffset и Duration (для нарезанных семплов)
+                    var skipTakeProvider = new SkipTakeSampleProvider(
+                        resampler.ToSampleProvider(),
+                        TimeSpan.FromSeconds(sample.FileOffset),
+                        TimeSpan.FromSeconds(sample.Duration));
+
+                    var volumeProvider = new VolumeSampleProvider(skipTakeProvider)
                     {
                         Volume = sample.Volume
                     };

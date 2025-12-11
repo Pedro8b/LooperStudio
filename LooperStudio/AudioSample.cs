@@ -14,6 +14,7 @@ namespace LooperStudio
         public int TrackNumber { get; set; } // Номер трека (0, 1, 2...)
         public double Duration { get; set; } // Длительность в секундах
         public float Volume { get; set; } = 1.0f; // Громкость 0.0 - 1.0
+        public double FileOffset { get; set; } = 0.0; // Смещение от начала файла в секундах (для нарезки)
         public Guid Id { get; set; }
 
         public AudioSample()
@@ -29,6 +30,7 @@ namespace LooperStudio
             StartTime = startTime;
             TrackNumber = trackNumber;
             Volume = 1.0f;
+            FileOffset = 0.0;
         }
     }
 }
