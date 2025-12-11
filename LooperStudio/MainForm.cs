@@ -328,13 +328,13 @@ namespace LooperStudio
         private void BpmNumeric_ValueChanged(object sender, EventArgs e)
         {
             currentProject.BPM = (int)bpmNumeric.Value;
-            timeline.Invalidate();
+            timeline.Invalidate(); // Перерисовываем таймлайн
         }
 
         private void SnapToGridCheckbox_CheckedChanged(object sender, EventArgs e)
         {
             currentProject.SnapToGrid = snapToGridCheckbox.Checked;
-            timeline.Invalidate();
+            timeline.Invalidate(); // Перерисовываем таймлайн
         }
 
         private void GridDivisionCombo_SelectedIndexChanged(object sender, EventArgs e)
@@ -346,9 +346,8 @@ namespace LooperStudio
                 case 2: currentProject.GridDivision = 16; break;
                 case 3: currentProject.GridDivision = 32; break;
             }
-            timeline.Invalidate();
+            timeline.Invalidate(); // Перерисовываем таймлайн
         }
-
         // Обработчики ListBox
         private void SampleLibrary_DrawItem(object sender, DrawItemEventArgs e)
         {
