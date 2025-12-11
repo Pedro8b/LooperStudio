@@ -18,7 +18,7 @@ namespace LooperStudio
         private const int TrackHeight = 60;
         private const int TimelineHeaderHeight = 60;
         private const double PixelsPerSecond = 100;
-        private AudioSample selectedSample = null;
+        public AudioSample selectedSample = null;
         private bool isDragging = false;
         private Point dragStartPoint;
         private double sampleStartTimeBeforeDrag;
@@ -126,7 +126,8 @@ namespace LooperStudio
         {
             if (project == null) return;
 
-            double maxTime = 30;
+            // Вычисляем минимальную ширину на основе самого длинного семпла
+            double maxTime = 120; // Минимум 2 минуты (было 30 секунд)
             foreach (var sample in project.Samples)
             {
                 double endTime = sample.StartTime + sample.Duration;
@@ -134,8 +135,11 @@ namespace LooperStudio
                     maxTime = endTime;
             }
 
+            // Добавляем 20% запаса для удобства
+            maxTime *= 1.2;
+
             Width = (int)(maxTime * PixelsPerSecond) + 100;
-            Height = TimelineHeaderHeight + (project.TrackCount * TrackHeight);
+            Height = TimelineHeaderHeight + (project.TrackCount * TrackHeight) + 80; // +80 для кнопки добавления трека
         }
 
         protected override void OnPaint(PaintEventArgs e)
@@ -156,6 +160,37 @@ namespace LooperStudio
             }
 
             DrawSamples(g);
+            DrawAddTrackButton(g);
+        }
+
+        private void DrawAddTrackButton(Graphics g)
+        {
+            int y = TimelineHeaderHeight + (project.TrackCount * TrackHeight) + 10;
+            int buttonWidth = 150;
+            int buttonHeight = 40;
+            int x = 20;
+
+            Rectangle buttonRect = new Rectangle(x, y, buttonWidth, buttonHeight);
+
+            // Проверяем наведение мыши
+            Point mousePos = PointToClient(MousePosition);
+            bool isHovered = buttonRect.Contains(mousePos);
+
+            // Рисуем кнопку
+            Color buttonColor = isHovered ? Color.FromArgb(70, 130, 180) : Color.FromArgb(60, 60, 62);
+            g.FillRectangle(new SolidBrush(buttonColor), buttonRect);
+            g.DrawRectangle(new Pen(Color.FromArgb(100, 100, 100), 2), buttonRect);
+
+            // Рисуем текст
+            using (Font font = new Font("Segoe UI", 10, FontStyle.Bold))
+            {
+                StringFormat sf = new StringFormat
+                {
+                    Alignment = StringAlignment.Center,
+                    LineAlignment = StringAlignment.Center
+                };
+                g.DrawString("+ Add Track", font, Brushes.White, buttonRect, sf);
+            }
         }
 
         private void DrawTimelineHeader(Graphics g)
@@ -284,6 +319,19 @@ namespace LooperStudio
         {
             if (e.Button == MouseButtons.Left)
             {
+                // Проверяем клик по кнопке "Add Track"
+                int addButtonY = TimelineHeaderHeight + (project.TrackCount * TrackHeight) + 10;
+                Rectangle addButtonRect = new Rectangle(20, addButtonY, 150, 40);
+
+                if (addButtonRect.Contains(e.Location))
+                {
+                    // Добавляем новый трек
+                    project.TrackCount++;
+                    UpdateSize();
+                    Invalidate();
+                    return;
+                }
+
                 AudioSample clickedSample = GetSampleAtPoint(e.Location);
 
                 if (clickedSample != null)
@@ -308,6 +356,20 @@ namespace LooperStudio
 
         private void TimelineControl_MouseMove(object sender, MouseEventArgs e)
         {
+            // Проверяем наведение на кнопку "Add Track"
+            int addButtonY = TimelineHeaderHeight + (project.TrackCount * TrackHeight) + 10;
+            Rectangle addButtonRect = new Rectangle(20, addButtonY, 150, 40);
+
+            if (addButtonRect.Contains(e.Location))
+            {
+                Cursor = Cursors.Hand;
+                if (!isDragging) Invalidate(); // Перерисовываем для эффекта hover
+            }
+            else
+            {
+                Cursor = Cursors.Default;
+            }
+
             if (isDragging && selectedSample != null)
             {
                 int totalDeltaX = e.X - dragStartPoint.X;
@@ -383,6 +445,16 @@ namespace LooperStudio
             }
         }
 
+        public void DeleteSample(AudioSample sample)
+        {
+            if (selectedSample != null && project != null)
+            {
+                project.Samples.Remove(sample);
+                sample = null;
+                Invalidate();
+            }
+        }
+
         public void CopySelectedSample()
         {
             if (selectedSample != null)
@@ -418,6 +490,13 @@ namespace LooperStudio
                 UpdateSize();
                 Invalidate();
             }
+        }
+        public void AddSample(AudioSample sample)
+        {
+            project.Samples.Add(sample);
+            selectedSample = sample;
+            UpdateSize(); 
+            Invalidate();
         }
     }
 }

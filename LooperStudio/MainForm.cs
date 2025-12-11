@@ -6,6 +6,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using NAudio.Wave;
 
 namespace LooperStudio
 {
@@ -17,6 +18,7 @@ namespace LooperStudio
         private TimelineControl timeline;
         private string lastRecordedFile;
         private bool Recording = false;
+        private double splitNum = 0;
 
         public MainForm()
         {
@@ -273,7 +275,17 @@ namespace LooperStudio
                 }
             }
         }
-
+        private void SplitButton_Click(object sender, EventArgs e)
+        {
+            using (var SplitForm = new SplitForm())
+            {
+                if (SplitForm.ShowDialog() == DialogResult.OK && timeline.selectedSample != null)
+                {
+                    splitNum = SplitForm.split;
+                    SplitSample(timeline.selectedSample,splitNum);
+                }
+            }
+        }
         private void SettingsButton_Click(object sender, EventArgs e)
         {
             using (var settingsForm = new SettingsForm(
@@ -410,6 +422,46 @@ namespace LooperStudio
                 MessageBox.Show($"Ошибка добавления семпла: {ex.Message}", "Ошибка");
             }
         }
+         private void SplitSample(AudioSample original, double splitTime)
+            {
+            Debug.WriteLine(splitTime);
+            Debug.WriteLine(original.Duration / splitTime);
+            if (splitTime <= 0 || original.Duration*splitTime >= original.Duration)
+            {
+                MessageBox.Show("Выберите значения между 0 и 8", "Ошибка");
+            }
+            else
+            {
+                double StartTime1 = original.StartTime;
+                double StartTime2 = original.StartTime + splitTime*original.Duration;
+                double Duration1 = original.Duration - splitTime*original.Duration;
+                double Duration2 = splitTime * original.Duration;
+
+                // 3. Создание первой части (копируем и корректируем)
+
+                var sample1 = new AudioSample
+                {
+                    FilePath = original.FilePath,
+                    Name = original.Name + " - Chop_1",
+                    StartTime = StartTime1,
+                    TrackNumber = original.TrackNumber,
+                    Duration = Duration1
+                };
+                currentProject.Samples.Add(sample1);
+                timeline.SetProject(currentProject);
+                var sample2 = new AudioSample
+                {
+                    FilePath = original.FilePath,
+                    Name = original.Name + " - Chop_2",
+                    StartTime = StartTime2,
+                    TrackNumber = original.TrackNumber,
+                    Duration = Duration2
+                };
+                timeline.AddSample(sample1);
+                timeline.AddSample(sample2);
+                timeline.DeleteSample(original);
+            }
+         }
 
         private void PlayProject()
         {
@@ -531,9 +583,20 @@ namespace LooperStudio
             if (e.KeyCode == Keys.Space)
             {
                 if (mixerEngine.IsPlaying)
+                {
+                    // Сейчас играет - ставим на паузу
                     mixerEngine.Pause();
+                }
+                else if (mixerEngine.CurrentPlaybackState == PlaybackState.Paused)
+                {
+                    // Сейчас пауза - продолжаем
+                    mixerEngine.Resume();
+                }
                 else
+                {
+                    // Остановлено - начинаем с начала
                     PlayProject();
+                }
                 e.Handled = true;
             }
             else if (e.KeyCode == Keys.Delete)

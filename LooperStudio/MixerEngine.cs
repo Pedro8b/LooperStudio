@@ -22,6 +22,7 @@ namespace LooperStudio
         public bool IsPlaying => isPlaying;
         public double CurrentTime => currentTime;
         public int OutputDeviceNumber { get; set; } = 0;
+        public PlaybackState CurrentPlaybackState => outputDevice?.PlaybackState ?? PlaybackState.Stopped;
 
         public event EventHandler PlaybackStopped;
 
@@ -307,5 +308,9 @@ namespace LooperStudio
         {
             position = 0;
         }
+    }
+    public class SampleManager
+    {
+
     }
 }
