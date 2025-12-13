@@ -38,10 +38,10 @@ namespace LooperStudio
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(184, 110);
+            ClientSize = new Size(162, 110);
             BackColor = Color.FromArgb(37, 37, 38);
             Name = "SplitForm";
-            Text = "Form1";
+            Text = "Разделить";
             ResumeLayout(false);
             InitializeSlider();
         }
@@ -74,8 +74,8 @@ namespace LooperStudio
             SubmitSlider = new System.Windows.Forms.Button
             {
                 Text = "Разделить",
-                Location = new Point(50, 75),
-                Size = new Size(80, 30),
+                Location = new Point(42, 75),
+                Size = new Size(92, 30),
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White
             };

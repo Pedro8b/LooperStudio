@@ -20,7 +20,7 @@ namespace LooperStudio
         }
         private void Slider_ValueChanged(object sender, EventArgs e)
         {
-            DenumLabel.Text  = Slider.Value.ToString();
+            DenumLabel.Text = (Slider.Value / 8.0).ToString();
         }
         private void SubmitSlider_Click(object sender, EventArgs e)
         {

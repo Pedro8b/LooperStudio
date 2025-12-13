@@ -152,7 +152,7 @@ namespace LooperStudio
             if (!Recording)
             {
                 Recording = true;
-                MessageBox.Show("Идет запись... Нажмите Record ещё раз для завершения.", "Запись");
+                MessageBox.Show("Идет запись... Нажмите кнопку записи ещё раз для завершения.", "Запись");
                 recordInstance.Record();
                 recordButton.ForeColor = System.Drawing.Color.Red;
             }

@@ -220,7 +220,7 @@ namespace LooperStudio
                     Alignment = StringAlignment.Center,
                     LineAlignment = StringAlignment.Center
                 };
-                g.DrawString("+ Add Track", font, Brushes.White, buttonRect, sf);
+                g.DrawString("+ Добавить дорожку", font, Brushes.White, buttonRect, sf);
             }
         }
 
@@ -252,7 +252,7 @@ namespace LooperStudio
             {
                 using (Font infoFont = new Font("Segoe UI", 9, FontStyle.Bold))
                 {
-                    string gridInfo = $"Grid: 1/{project.GridDivision} | BPM: {project.BPM}";
+                    string gridInfo = $"Сетка: 1/{project.GridDivision} | Темп: {project.BPM}";
                     var size = g.MeasureString(gridInfo, infoFont);
 
                     // Рисуем в правом верхнем углу с фоном
@@ -285,7 +285,7 @@ namespace LooperStudio
 
                 using (Font font = new Font("Segoe UI", 9))
                 {
-                    g.DrawString($"Track {i + 1}", font, Brushes.Gray, 5, y + 5);
+                    g.DrawString($"Дорожка {i + 1}", font, Brushes.Gray, 5, y + 5);
                 }
             }
         }
@@ -389,7 +389,7 @@ namespace LooperStudio
 
             using (Font font = new Font("Segoe UI", 9, FontStyle.Bold))
             {
-                string durationText = $"{sample.Duration:F2}s";
+                string durationText = $"{sample.Duration:F2}сек.";
                 var textSize = g.MeasureString(durationText, font);
                 g.DrawString(durationText, font, Brushes.Yellow,
                     x + (width / 2) - (textSize.Width / 2), y + (height / 2) - (textSize.Height / 2));
@@ -399,7 +399,7 @@ namespace LooperStudio
             {
                 // Цвет текста громкости зависит от уровня
                 Brush volumeBrush = sample.Volume > 1.0f ? Brushes.Yellow : Brushes.LightGray;
-                string volumeText = $"Vol: {(int)(sample.Volume * 100)}%";
+                string volumeText = $"Громк.: {(int)(sample.Volume * 100)}%";
 
                 if (sample.Volume > 1.0f)
                     volumeText += " ⚠";

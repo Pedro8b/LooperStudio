@@ -91,7 +91,7 @@ namespace LooperStudio
             {
                 Text = "💾 Сохранить",
                 Location = new Point(280, 10),
-                Size = new Size(100, 30),
+                Size = new Size(110, 30),
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White
             };
@@ -102,7 +102,7 @@ namespace LooperStudio
             loadButton = new Button
             {
                 Text = "📁 Загрузить",
-                Location = new Point(385, 10),
+                Location = new Point(395, 10),
                 Size = new Size(100, 30),
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White
@@ -114,7 +114,7 @@ namespace LooperStudio
             addSampleButton = new Button
             {
                 Text = "+ Добавить",
-                Location = new Point(505, 10),
+                Location = new Point(515, 10),
                 Size = new Size(100, 30),
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White
@@ -126,7 +126,7 @@ namespace LooperStudio
             SplitSampleButton = new Button
             {
                 Text = "Разделить",
-                Location = new Point(610, 10),
+                Location = new Point(620, 10),
                 Size = new Size(100, 30),
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White
@@ -138,8 +138,8 @@ namespace LooperStudio
             settingsButton = new Button
             {
                 Text = "⚙ Настройки",
-                Location = new Point(730, 10),
-                Size = new Size(100, 30),
+                Location = new Point(740, 10),
+                Size = new Size(110, 30),
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White
             };
@@ -150,8 +150,8 @@ namespace LooperStudio
             exportButton = new Button
             {
                 Text = "📤 Экспорт",
-                Location = new Point(835, 10),
-                Size = new Size(80, 30),
+                Location = new Point(855, 10),
+                Size = new Size(90, 30),
                 FlatStyle = FlatStyle.Flat,
                 ForeColor = Color.White
             };
@@ -164,7 +164,7 @@ namespace LooperStudio
             var bpmLabel = new Label
             {
                 Text = "Темп:",
-                Location = new Point(935, 15),
+                Location = new Point(955, 15),
                 Size = new Size(40, 20),
                 ForeColor = Color.White
             };
@@ -173,7 +173,7 @@ namespace LooperStudio
             // NumericUpDown для BPM
             bpmNumeric = new NumericUpDown
             {
-                Location = new Point(980, 12),
+                Location = new Point(1000, 12),
                 Size = new Size(60, 25),
                 Minimum = 40,
                 Maximum = 300,
@@ -188,8 +188,8 @@ namespace LooperStudio
             snapToGridCheckbox = new CheckBox
             {
                 Text = "Привязка",
-                Location = new Point(1055, 15),
-                Size = new Size(80, 20),
+                Location = new Point(1075, 15),
+                Size = new Size(90, 20),
                 ForeColor = Color.White,
                 Checked = false
             };
@@ -199,7 +199,7 @@ namespace LooperStudio
             // ComboBox для Grid Division
             gridDivisionCombo = new ComboBox
             {
-                Location = new Point(1140, 12),
+                Location = new Point(1170, 12),
                 Size = new Size(70, 25),
                 DropDownStyle = ComboBoxStyle.DropDownList,
                 BackColor = Color.FromArgb(60, 60, 60),
@@ -238,7 +238,7 @@ namespace LooperStudio
 
             libraryLabel = new Label
             {
-                Text = "Sample Library",
+                Text = "Библиотека семплов",
                 Dock = DockStyle.Top,
                 Height = 30,
                 ForeColor = Color.White,

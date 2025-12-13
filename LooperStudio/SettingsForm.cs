@@ -87,7 +87,7 @@ namespace LooperStudio
 
         private void InitializeComponent()
         {
-            this.Text = "Settings";
+            this.Text = "Настройки";
             this.Size = new System.Drawing.Size(450, 300);
             this.FormBorderStyle = FormBorderStyle.FixedDialog;
             this.MaximizeBox = false;
@@ -97,7 +97,7 @@ namespace LooperStudio
             // Метка для устройства ввода
             var inputLabel = new Label
             {
-                Text = "Input Device (Recording):",
+                Text = "Устройство ввода (запись):",
                 Location = new System.Drawing.Point(20, 20),
                 Size = new System.Drawing.Size(200, 20)
             };
@@ -115,7 +115,7 @@ namespace LooperStudio
             // Метка для устройства вывода
             var outputLabel = new Label
             {
-                Text = "Output Device (Playback):",
+                Text = "Устройство вывода (воспроизведение):",
                 Location = new System.Drawing.Point(20, 85),
                 Size = new System.Drawing.Size(200, 20)
             };
@@ -133,7 +133,7 @@ namespace LooperStudio
             // Метка для папки семплов
             var samplesFolderLabel = new Label
             {
-                Text = "Samples Folder:",
+                Text = "Папка семплов:",
                 Location = new System.Drawing.Point(20, 150),
                 Size = new System.Drawing.Size(200, 20)
             };
@@ -143,16 +143,16 @@ namespace LooperStudio
             samplesFolderTextBox = new TextBox
             {
                 Location = new System.Drawing.Point(20, 175),
-                Size = new System.Drawing.Size(320, 25)
+                Size = new System.Drawing.Size(315, 25)
             };
             this.Controls.Add(samplesFolderTextBox);
 
             // Кнопка Browse для выбора папки
             browseFolderButton = new Button
             {
-                Text = "Browse...",
-                Location = new System.Drawing.Point(350, 173),
-                Size = new System.Drawing.Size(70, 25)
+                Text = "Выбрать",
+                Location = new System.Drawing.Point(340, 173),
+                Size = new System.Drawing.Size(80, 30)
             };
             browseFolderButton.Click += BrowseFolderButton_Click;
             this.Controls.Add(browseFolderButton);
@@ -160,9 +160,9 @@ namespace LooperStudio
             // Кнопка Save
             saveButton = new Button
             {
-                Text = "Save",
-                Location = new System.Drawing.Point(245, 220),
-                Size = new System.Drawing.Size(80, 30)
+                Text = "Сохранить",
+                Location = new System.Drawing.Point(235, 220),
+                Size = new System.Drawing.Size(100, 30)
             };
             saveButton.Click += SaveButton_Click;
             this.Controls.Add(saveButton);
@@ -170,7 +170,7 @@ namespace LooperStudio
             // Кнопка Cancel
             cancelButton = new Button
             {
-                Text = "Cancel",
+                Text = "Отмена",
                 Location = new System.Drawing.Point(340, 220),
                 Size = new System.Drawing.Size(80, 30)
             };
