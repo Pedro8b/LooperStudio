@@ -2,9 +2,11 @@
 
 namespace LooperStudio
 {
-    /// <summary>
+    
+
+
     /// Представляет аудио-семпл на таймлайне
-    /// </summary>
+    
     [Serializable]
     public class AudioSample
     {

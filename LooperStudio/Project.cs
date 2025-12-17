@@ -5,9 +5,10 @@ using System.Text.Json;
 
 namespace LooperStudio
 {
-    /// <summary>
+    
+
     /// Представляет проект DAW
-    /// </summary>
+    
     [Serializable]
     public class Project
     {
@@ -32,9 +33,9 @@ namespace LooperStudio
             Name = "Новый проект";
         }
 
-        /// <summary>
+        
         /// Получить размер одной доли сетки в секундах
-        /// </summary>
+        
         public double GetGridSize()
         {
             // Длительность одного бита в секундах
@@ -43,9 +44,9 @@ namespace LooperStudio
             return beatDuration / (GridDivision / 4.0);
         }
 
-        /// <summary>
+        
         /// Сохранить проект в JSON файл
-        /// </summary>
+        
         public void Save(string filePath)
         {
             var options = new JsonSerializerOptions
@@ -56,9 +57,9 @@ namespace LooperStudio
             File.WriteAllText(filePath, json);
         }
 
-        /// <summary>
+        
         /// Загрузить проект из JSON файла
-        /// </summary>
+        
         public static Project Load(string filePath)
         {
             string json = File.ReadAllText(filePath);

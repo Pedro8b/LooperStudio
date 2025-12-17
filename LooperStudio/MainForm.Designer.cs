@@ -5,38 +5,35 @@ namespace LooperStudio
 {
     partial class MainForm
     {
-        /// <summary>
-        ///  Required designer variable.
-        /// </summary>
         private System.ComponentModel.IContainer components = null;
 
-        /// <summary>
-        ///  Clean up any resources being used.
-        /// </summary>
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                mixerEngine?.Dispose();
+                recordInstance = null;
+                components?.Dispose();
+            }
+            base.Dispose(disposing);
+        }
 
         #region Windows Form Designer generated code
 
-        /// <summary>
-        ///  Required method for Designer support - do not modify
-        ///  the contents of this method with the code editor.
-        /// </summary>
         private void InitializeComponent()
         {
             SuspendLayout();
 
-            // 
-            // MainForm
-            // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(1500, 700);
             Name = "MainForm";
             Text = "Looper Studio";
 
-            // Создаем все UI элементы
-            InitializeToolbar();
+            InitializePlaybackControls();
             InitializeTimelinePanel();
             InitializeSampleLibrary();
+            InitializeToolbar();
 
             ResumeLayout(false);
         }
@@ -50,7 +47,6 @@ namespace LooperStudio
                 BackColor = Color.FromArgb(37, 37, 38)
             };
 
-            // Кнопка воспроизведения
             playButton = new Button
             {
                 Text = "▶ Играть",
@@ -62,7 +58,6 @@ namespace LooperStudio
             playButton.Click += PlayButton_Click;
             toolbar.Controls.Add(playButton);
 
-            // Кнопка остановки
             stopButton = new Button
             {
                 Text = "⬛ Стоп",
@@ -74,7 +69,6 @@ namespace LooperStudio
             stopButton.Click += StopButton_Click;
             toolbar.Controls.Add(stopButton);
 
-            // Кнопка записи
             recordButton = new Button
             {
                 Text = "⏺ Запись",
@@ -86,7 +80,6 @@ namespace LooperStudio
             recordButton.Click += RecordButton_Click;
             toolbar.Controls.Add(recordButton);
 
-            // Кнопка сохранения проекта
             saveButton = new Button
             {
                 Text = "💾 Сохранить",
@@ -98,7 +91,6 @@ namespace LooperStudio
             saveButton.Click += SaveButton_Click;
             toolbar.Controls.Add(saveButton);
 
-            // Кнопка загрузки проекта
             loadButton = new Button
             {
                 Text = "📁 Загрузить",
@@ -110,7 +102,6 @@ namespace LooperStudio
             loadButton.Click += LoadButton_Click;
             toolbar.Controls.Add(loadButton);
 
-            // Кнопка добавления семпла
             addSampleButton = new Button
             {
                 Text = "+ Добавить",
@@ -122,7 +113,6 @@ namespace LooperStudio
             addSampleButton.Click += AddSampleButton_Click;
             toolbar.Controls.Add(addSampleButton);
 
-            // Кнопка нарезки
             SplitSampleButton = new Button
             {
                 Text = "Разделить",
@@ -134,7 +124,6 @@ namespace LooperStudio
             SplitSampleButton.Click += SplitButton_Click;
             toolbar.Controls.Add(SplitSampleButton);
 
-            // Кнопка настроек
             settingsButton = new Button
             {
                 Text = "⚙ Настройки",
@@ -146,7 +135,6 @@ namespace LooperStudio
             settingsButton.Click += SettingsButton_Click;
             toolbar.Controls.Add(settingsButton);
 
-            // Кнопка экспорта
             exportButton = new Button
             {
                 Text = "📤 Экспорт",
@@ -160,7 +148,6 @@ namespace LooperStudio
 
             // === НАСТРОЙКИ СЕТКИ И BPM ===
 
-            // Label для BPM
             var bpmLabel = new Label
             {
                 Text = "Темп:",
@@ -170,7 +157,6 @@ namespace LooperStudio
             };
             toolbar.Controls.Add(bpmLabel);
 
-            // NumericUpDown для BPM
             bpmNumeric = new NumericUpDown
             {
                 Location = new Point(1000, 12),
@@ -184,7 +170,6 @@ namespace LooperStudio
             bpmNumeric.ValueChanged += BpmNumeric_ValueChanged;
             toolbar.Controls.Add(bpmNumeric);
 
-            // CheckBox для Snap to Grid
             snapToGridCheckbox = new CheckBox
             {
                 Text = "Привязка",
@@ -196,7 +181,6 @@ namespace LooperStudio
             snapToGridCheckbox.CheckedChanged += SnapToGridCheckbox_CheckedChanged;
             toolbar.Controls.Add(snapToGridCheckbox);
 
-            // ComboBox для Grid Division
             gridDivisionCombo = new ComboBox
             {
                 Location = new Point(1170, 12),
@@ -213,6 +197,57 @@ namespace LooperStudio
             this.Controls.Add(toolbar);
         }
 
+        private void InitializePlaybackControls()
+        {
+            playbackControlPanel = new Panel
+            {
+                Dock = DockStyle.Top,
+                Height = 60,
+                BackColor = Color.FromArgb(30, 30, 30)
+            };
+
+            // Текущее время
+            currentTimeLabel = new Label
+            {
+                Text = "0:00.0",
+                Location = new Point(10, 20),
+                Size = new Size(60, 20),
+                ForeColor = Color.White,
+                Font = new Font("Consolas", 10, FontStyle.Bold)
+            };
+            playbackControlPanel.Controls.Add(currentTimeLabel);
+
+            // Слайдер прогресса
+            playbackSlider = new TrackBar
+            {
+                Location = new Point(75, 10),
+                Size = new Size(1300, 45),
+                Minimum = 0,
+                Maximum = 10000, // Будем масштабировать
+                TickFrequency = 1000,
+                LargeChange = 1000,
+                SmallChange = 100,
+                BackColor = Color.FromArgb(30, 30, 30)
+            };
+            playbackSlider.Scroll += PlaybackSlider_Scroll;
+            playbackSlider.MouseDown += PlaybackSlider_MouseDown;
+            playbackSlider.MouseUp += PlaybackSlider_MouseUp;
+            playbackControlPanel.Controls.Add(playbackSlider);
+
+            // Общая длительность
+            totalTimeLabel = new Label
+            {
+                Text = "0:00.0",
+                Location = new Point(1380, 20),
+                Size = new Size(60, 20),
+                ForeColor = Color.White,
+                Font = new Font("Consolas", 10, FontStyle.Bold)
+            };
+            playbackControlPanel.Controls.Add(totalTimeLabel);
+
+            this.Controls.Add(playbackControlPanel);
+        }
+
         private void InitializeTimelinePanel()
         {
             timelinePanel = new Panel
@@ -220,7 +255,7 @@ namespace LooperStudio
                 Dock = DockStyle.Fill,
                 AutoScroll = true,
                 BackColor = Color.FromArgb(30, 30, 30),
-                Padding = new Padding(0, 0, 0, 0) // Убираем все отступы
+                Padding = new Padding(0, 0, 0, 0)
             };
 
             this.Controls.Add(timelinePanel);
@@ -257,7 +292,7 @@ namespace LooperStudio
                 ItemHeight = 20,
                 IntegralHeight = false,
                 DrawMode = DrawMode.OwnerDrawFixed,
-                ScrollAlwaysVisible = false, // Скролл появляется автоматически
+                ScrollAlwaysVisible = false,
                 HorizontalScrollbar = false
             };
 
@@ -288,15 +323,15 @@ namespace LooperStudio
         private CheckBox snapToGridCheckbox;
         private ComboBox gridDivisionCombo;
 
+        private Panel playbackControlPanel;
+        private TrackBar playbackSlider;
+        private Label currentTimeLabel;
+        private Label totalTimeLabel;
+
         private Panel timelinePanel;
 
         private Panel libraryPanel;
         private Label libraryLabel;
         private ListBox sampleLibrary;
-
-        // Старые кнопки для совместимости (не используются)
-        private Button Record = new Button();
-        private Button Stop = new Button();
-        private Button Play = new Button();
     }
 }

@@ -7,9 +7,9 @@ using System.Linq;
 
 namespace LooperStudio
 {
-    /// <summary>
+    
     /// Движок для воспроизведения и микширования нескольких семплов одновременно
-    /// </summary>
+    
     public class MixerEngine : IDisposable
     {
         private WaveOutEvent outputDevice;
@@ -19,18 +19,23 @@ namespace LooperStudio
         private double currentTime;
         private System.Timers.Timer playbackTimer;
         private List<PausableSampleProvider> pausableSamples;
+        private List<OffsetSampleProvider> offsetProviders;
+        private double projectDuration;
 
         public bool IsPlaying => isPlaying;
         public double CurrentTime => currentTime;
+        public double ProjectDuration => projectDuration;
         public int OutputDeviceNumber { get; set; } = 0;
         public PlaybackState CurrentPlaybackState => outputDevice?.PlaybackState ?? PlaybackState.Stopped;
 
         public event EventHandler PlaybackStopped;
+        public event EventHandler<double> PlaybackPositionChanged;
 
         public MixerEngine()
         {
             activeSounds = new List<CachedSoundSampleProvider>();
             pausableSamples = new List<PausableSampleProvider>();
+            offsetProviders = new List<OffsetSampleProvider>();
             InitializeOutput();
         }
 
@@ -44,12 +49,13 @@ namespace LooperStudio
 
             outputDevice.Init(mixer);
 
-            playbackTimer = new System.Timers.Timer(100);
+            playbackTimer = new System.Timers.Timer(50); // Обновляем каждые 50мс для плавности
             playbackTimer.Elapsed += (s, e) =>
             {
                 if (isPlaying)
                 {
-                    currentTime += 0.1;
+                    currentTime += 0.05;
+                    PlaybackPositionChanged?.Invoke(this, currentTime);
                 }
             };
 
@@ -70,28 +76,43 @@ namespace LooperStudio
             InitializeOutput();
         }
 
-        /// <summary>
-        /// Воспроизвести проект с начала
-        /// </summary>
-        public void Play(Project project)
+        
+        /// Воспроизвести проект с указанной позиции
+        
+        public void Play(Project project, double startTime = 0)
         {
             Stop();
-            currentTime = 0;
+            currentTime = startTime;
 
-            Debug.WriteLine("=== НАЧАЛО ВОСПРОИЗВЕДЕНИЯ ===");
+            Debug.WriteLine($"=== НАЧАЛО ВОСПРОИЗВЕДЕНИЯ С ПОЗИЦИИ {startTime}s ===");
 
             pausableSamples.Clear();
+            offsetProviders.Clear();
+
+            // Вычисляем длительность проекта
+            projectDuration = 0;
+            foreach (var sample in project.Samples)
+            {
+                double endTime = sample.StartTime + sample.Duration;
+                if (endTime > projectDuration)
+                    projectDuration = endTime;
+            }
 
             foreach (var sample in project.Samples)
             {
                 try
                 {
-                    Debug.WriteLine($"Загрузка семпла: {sample.Name}");
-                    Debug.WriteLine($"  StartTime: {sample.StartTime}s");
-                    Debug.WriteLine($"  Duration: {sample.Duration}s");
-                    Debug.WriteLine($"  FileOffset: {sample.FileOffset}s");
+                    // Пропускаем семплы, которые уже закончились
+                    if (sample.StartTime + sample.Duration <= startTime)
+                    {
+                        Debug.WriteLine($"Пропускаем семпл {sample.Name} (уже закончился)");
+                        continue;
+                    }
 
-                    ScheduleSample(sample);
+                    Debug.WriteLine($"Загрузка семпла: {sample.Name}");
+                    Debug.WriteLine($"  StartTime: {sample.StartTime}s, Duration: {sample.Duration}s");
+
+                    ScheduleSample(sample, startTime);
                 }
                 catch (Exception ex)
                 {
@@ -104,50 +125,80 @@ namespace LooperStudio
             outputDevice.Play();
         }
 
-        /// <summary>
-        /// Запланировать воспроизведение семпла
-        /// </summary>
-        private void ScheduleSample(AudioSample sample)
+        
+        /// Запланировать воспроизведение семпла с учётом стартовой позиции
+        
+        private void ScheduleSample(AudioSample sample, double playbackStartTime)
         {
             try
             {
-                Debug.WriteLine($"=== ПЛАНИРОВАНИЕ СЕМПЛА ===");
-                Debug.WriteLine($"Имя: {sample.Name}");
-                Debug.WriteLine($"Должен начаться в: {sample.StartTime}s");
-                Debug.WriteLine($"Длительность семпла: {sample.Duration}s");
-
                 var audioFile = new AudioFileReader(sample.FilePath);
-
-                Debug.WriteLine($"Реальная длительность файла: {audioFile.TotalTime.TotalSeconds}s");
-
                 var resampler = new MediaFoundationResampler(audioFile, WaveFormat.CreateIeeeFloatWaveFormat(44100, 2));
 
-                var skipTakeProvider = new SkipTakeSampleProvider(
-                    resampler.ToSampleProvider(),
-                    TimeSpan.FromSeconds(sample.FileOffset),
-                    TimeSpan.FromSeconds(sample.Duration));
+                double sampleStartInPlayback = sample.StartTime;
+                double sampleEndInPlayback = sample.StartTime + sample.Duration;
 
-                Debug.WriteLine($"FileOffset: {sample.FileOffset}s, Duration: {sample.Duration}s");
-
-                var volumeProvider = new VolumeSampleProvider(skipTakeProvider)
+                // Если семпл должен начаться после текущей позиции
+                if (sampleStartInPlayback >= playbackStartTime)
                 {
-                    Volume = sample.Volume
-                };
+                    // Воспроизводим с начала семпла, но с задержкой
+                    double delay = sampleStartInPlayback - playbackStartTime;
 
-                // Оборачиваем в PausableSampleProvider для поддержки паузы
-                var pausableProvider = new PausableSampleProvider(volumeProvider);
-                pausableSamples.Add(pausableProvider);
+                    var skipTakeProvider = new SkipTakeSampleProvider(
+                        resampler.ToSampleProvider(),
+                        TimeSpan.FromSeconds(sample.FileOffset),
+                        TimeSpan.FromSeconds(sample.Duration));
 
-                var offsetProvider = new OffsetSampleProvider(pausableProvider)
+                    var volumeProvider = new VolumeSampleProvider(skipTakeProvider)
+                    {
+                        Volume = sample.Volume
+                    };
+
+                    var pausableProvider = new PausableSampleProvider(volumeProvider);
+                    pausableSamples.Add(pausableProvider);
+
+                    var offsetProvider = new OffsetSampleProvider(pausableProvider)
+                    {
+                        DelayBy = TimeSpan.FromSeconds(delay)
+                    };
+                    offsetProviders.Add(offsetProvider);
+
+                    mixer.AddMixerInput(offsetProvider);
+
+                    Debug.WriteLine($"Семпл {sample.Name} запланирован с задержкой {delay}s");
+                }
+                else
                 {
-                    DelayBy = TimeSpan.FromSeconds(sample.StartTime)
-                };
+                    // Семпл уже должен играть - начинаем с середины
+                    double timeIntoSample = playbackStartTime - sampleStartInPlayback;
+                    double remainingDuration = sample.Duration - timeIntoSample;
 
-                Debug.WriteLine($"Установлена задержка: {sample.StartTime}s");
+                    if (remainingDuration > 0)
+                    {
+                        var skipTakeProvider = new SkipTakeSampleProvider(
+                            resampler.ToSampleProvider(),
+                            TimeSpan.FromSeconds(sample.FileOffset + timeIntoSample),
+                            TimeSpan.FromSeconds(remainingDuration));
 
-                mixer.AddMixerInput(offsetProvider);
+                        var volumeProvider = new VolumeSampleProvider(skipTakeProvider)
+                        {
+                            Volume = sample.Volume
+                        };
 
-                Debug.WriteLine($"Семпл добавлен в микшер");
+                        var pausableProvider = new PausableSampleProvider(volumeProvider);
+                        pausableSamples.Add(pausableProvider);
+
+                        var offsetProvider = new OffsetSampleProvider(pausableProvider)
+                        {
+                            DelayBy = TimeSpan.Zero
+                        };
+                        offsetProviders.Add(offsetProvider);
+
+                        mixer.AddMixerInput(offsetProvider);
+
+                        Debug.WriteLine($"Семпл {sample.Name} начинается с позиции {timeIntoSample}s");
+                    }
+                }
             }
             catch (Exception ex)
             {
@@ -155,9 +206,24 @@ namespace LooperStudio
             }
         }
 
-        /// <summary>
+        
+        /// Перемотать на указанную позицию
+        
+        public void Seek(Project project, double time)
+        {
+            bool wasPlaying = isPlaying;
+            Play(project, time);
+
+            if (!wasPlaying)
+            {
+                // Если не играло, сразу ставим на паузу
+                Pause();
+            }
+        }
+
+        
         /// Остановить воспроизведение
-        /// </summary>
+        
         public void Stop()
         {
             if (outputDevice != null)
@@ -172,18 +238,18 @@ namespace LooperStudio
             mixer.RemoveAllMixerInputs();
             activeSounds.Clear();
             pausableSamples.Clear();
+            offsetProviders.Clear();
         }
 
-        /// <summary>
+        
         /// Пауза
-        /// </summary>
+        
         public void Pause()
         {
             if (outputDevice != null && isPlaying)
             {
                 Debug.WriteLine("=== ПАУЗА ===");
 
-                // Ставим все семплы на паузу
                 foreach (var pausable in pausableSamples)
                 {
                     pausable.Pause();
@@ -197,16 +263,17 @@ namespace LooperStudio
             }
         }
 
-        /// <summary>
+        
+        /// Продолжить воспроизведение <summary>
         /// Продолжить воспроизведение
-        /// </summary>
+                
+
         public void Resume()
         {
             if (outputDevice != null && !isPlaying && outputDevice.PlaybackState == PlaybackState.Paused)
             {
                 Debug.WriteLine("=== ПРОДОЛЖЕНИЕ ===");
 
-                // Возобновляем все семплы
                 foreach (var pausable in pausableSamples)
                 {
                     pausable.Resume();
@@ -226,12 +293,16 @@ namespace LooperStudio
             outputDevice?.Dispose();
             activeSounds.Clear();
             pausableSamples.Clear();
+            offsetProviders.Clear();
         }
     }
 
-    /// <summary>
+    
+
+
+
     /// Sample provider с поддержкой паузы
-    /// </summary>
+    
     public class PausableSampleProvider : ISampleProvider
     {
         private readonly ISampleProvider sourceProvider;
@@ -259,7 +330,6 @@ namespace LooperStudio
         {
             if (isPaused)
             {
-                // Во время паузы возвращаем тишину
                 Array.Clear(buffer, offset, count);
                 return count;
             }
@@ -268,9 +338,9 @@ namespace LooperStudio
         }
     }
 
-    /// <summary>
+    
     /// Sample provider с пропуском начала и ограничением длительности
-    /// </summary>
+    
     public class SkipTakeSampleProvider : ISampleProvider
     {
         private readonly ISampleProvider sourceProvider;
@@ -285,8 +355,6 @@ namespace LooperStudio
             sourceProvider = source;
             samplesToSkip = (long)(skipDuration.TotalSeconds * WaveFormat.SampleRate * WaveFormat.Channels);
             samplesRemaining = (long)(takeDuration.TotalSeconds * WaveFormat.SampleRate * WaveFormat.Channels);
-
-            Debug.WriteLine($"SkipTakeSampleProvider: Skip={skipDuration.TotalSeconds}s, Take={takeDuration.TotalSeconds}s");
         }
 
         public int Read(float[] buffer, int offset, int count)
@@ -305,7 +373,6 @@ namespace LooperStudio
                 }
 
                 skipped = true;
-                Debug.WriteLine($"SkipTakeSampleProvider: Пропущено {samplesToSkip} семплов");
             }
 
             if (samplesRemaining <= 0)
@@ -322,15 +389,14 @@ namespace LooperStudio
         }
     }
 
-    /// <summary>
+    
     /// Sample provider с задержкой старта
-    /// </summary>
+    
     public class OffsetSampleProvider : ISampleProvider
     {
         private readonly ISampleProvider sourceProvider;
         private int delayBySamples;
         private int delayRemaining;
-        private bool debugLogged = false;
 
         public WaveFormat WaveFormat => sourceProvider.WaveFormat;
 
@@ -341,8 +407,6 @@ namespace LooperStudio
             {
                 delayBySamples = (int)(value.TotalSeconds * WaveFormat.SampleRate * WaveFormat.Channels);
                 delayRemaining = delayBySamples;
-
-                Debug.WriteLine($"OffsetSampleProvider: Установлена задержка {value.TotalSeconds}s = {delayBySamples} семплов");
             }
         }
 
@@ -357,12 +421,6 @@ namespace LooperStudio
 
             if (delayRemaining > 0)
             {
-                if (!debugLogged)
-                {
-                    Debug.WriteLine($"OffsetSampleProvider: Начинаем задержку, осталось {delayRemaining} семплов");
-                    debugLogged = true;
-                }
-
                 int delaySamplesToWrite = Math.Min(delayRemaining, count);
                 for (int i = 0; i < delaySamplesToWrite; i++)
                 {
@@ -372,11 +430,6 @@ namespace LooperStudio
                 written += delaySamplesToWrite;
                 offset += delaySamplesToWrite;
                 count -= delaySamplesToWrite;
-
-                if (delayRemaining == 0)
-                {
-                    Debug.WriteLine($"OffsetSampleProvider: Задержка закончилась, начинаем воспроизведение");
-                }
             }
 
             if (count > 0)
@@ -388,9 +441,9 @@ namespace LooperStudio
         }
     }
 
-    /// <summary>
+    
     /// Кэшированный звук для эффективного воспроизведения
-    /// </summary>
+    
     public class CachedSoundSampleProvider : ISampleProvider
     {
         private readonly float[] audioData;
@@ -425,10 +478,5 @@ namespace LooperStudio
         {
             position = 0;
         }
-    }
-
-    public class SampleManager
-    {
-
     }
 }

@@ -9,16 +9,19 @@ using NAudio.Wave;
 
 namespace LooperStudio
 {
-    /// <summary>
+    
     /// Кастомный контрол для отображения таймлайна с семплами
-    /// </summary>
+    
     public class TimelineControl : Control
     {
         private Project project;
         private const int TrackHeight = 60;
         private const int TimelineHeaderHeight = 60;
         private const double PixelsPerSecond = 100;
-        private const int EdgeGrabWidth = 8; // Ширина зоны для захвата края семпла
+        private const int EdgeGrabWidth = 8;
+
+        // Курсор воспроизведения
+        private double playbackPosition = 0;
 
         // Выделение
         public AudioSample selectedSample = null;
@@ -34,7 +37,7 @@ namespace LooperStudio
         // Изменение размера
         private bool isResizing = false;
         private AudioSample resizingSample = null;
-        private bool resizingRightEdge = false; // true = правый край, false = левый край
+        private bool resizingRightEdge = false;
         private double originalDuration;
         private double originalFileOffset;
         private double originalStartTime;
@@ -44,10 +47,14 @@ namespace LooperStudio
         private Point selectionStartPoint;
         private Rectangle selectionRectangle;
 
+        // Перетаскивание курсора воспроизведения
+        private bool isDraggingPlayhead = false;
+
         private List<AudioSample> copiedSamples = new List<AudioSample>();
 
         public event EventHandler<AudioSample> SampleSelected;
         public event EventHandler<AudioSample> SampleDoubleClicked;
+        public event EventHandler<double> PlayheadMoved;
 
         public TimelineControl()
         {
@@ -63,6 +70,15 @@ namespace LooperStudio
 
             DragEnter += TimelineControl_DragEnter;
             DragDrop += TimelineControl_DragDrop;
+        }
+
+        
+        /// Установить позицию курсора воспроизведения
+        
+        public void SetPlaybackPosition(double time)
+        {
+            playbackPosition = time;
+            Invalidate();
         }
 
         private void TimelineControl_DragEnter(object sender, DragEventArgs e)
@@ -180,9 +196,9 @@ namespace LooperStudio
             }
 
             DrawSamples(g);
+            DrawPlaybackCursor(g);
             DrawAddTrackButton(g);
 
-            // Рисуем рамку выделения
             if (isSelecting)
             {
                 using (Pen selectionPen = new Pen(Color.FromArgb(150, 100, 150, 255), 2))
@@ -195,6 +211,58 @@ namespace LooperStudio
                     g.FillRectangle(selectionBrush, selectionRectangle);
                 }
             }
+        }
+
+        
+        /// Рисуем курсор воспроизведения <summary>
+        /// Рисуем курсор воспроизведения
+        
+        /// <param name="g"></param>        
+
+        private void DrawPlaybackCursor(Graphics g)
+        {
+            int x = (int)(playbackPosition * PixelsPerSecond);
+
+            // Линия курсора
+            using (Pen cursorPen = new Pen(Color.Red, 3))
+            {
+                g.DrawLine(cursorPen, x, 0, x, Height);
+            }
+
+            // Головка курсора (треугольник)
+            Point[] triangle = new Point[]
+            {
+                new Point(x, TimelineHeaderHeight - 15),
+                new Point(x - 8, TimelineHeaderHeight),
+                new Point(x + 8, TimelineHeaderHeight)
+            };
+            g.FillPolygon(Brushes.Red, triangle);
+
+            // Время на курсоре
+            using (Font font = new Font("Segoe UI", 9, FontStyle.Bold))
+            {
+                string timeText = $"{playbackPosition:F2}s";
+                var textSize = g.MeasureString(timeText, font);
+
+                Rectangle textBg = new Rectangle(
+                    x - (int)textSize.Width / 2 - 3,
+                    5,
+                    (int)textSize.Width + 6,
+                    (int)textSize.Height + 2);
+
+                g.FillRectangle(new SolidBrush(Color.FromArgb(200, 20, 20, 20)), textBg);
+                g.DrawString(timeText, font, Brushes.Red, x - textSize.Width / 2, 6);
+            }
+        }
+
+        
+        /// Проверяем клик по курсору воспроизведения
+        
+        private bool IsClickOnPlayhead(Point point)
+        {
+            int x = (int)(playbackPosition * PixelsPerSecond);
+            Rectangle playheadArea = new Rectangle(x - 10, 0, 20, TimelineHeaderHeight);
+            return playheadArea.Contains(point);
         }
 
         private void DrawAddTrackButton(Graphics g)
@@ -247,7 +315,6 @@ namespace LooperStudio
                 }
             }
 
-            // Показываем информацию о сетке
             if (project.SnapToGrid)
             {
                 using (Font infoFont = new Font("Segoe UI", 9, FontStyle.Bold))
@@ -255,7 +322,6 @@ namespace LooperStudio
                     string gridInfo = $"Сетка: 1/{project.GridDivision} | Темп: {project.BPM}";
                     var size = g.MeasureString(gridInfo, infoFont);
 
-                    // Рисуем в правом верхнем углу с фоном
                     Rectangle infoBg = new Rectangle(
                         Width - (int)size.Width - 20,
                         5,
@@ -297,7 +363,6 @@ namespace LooperStudio
 
             if (gridPixels < 5) return;
 
-            // Рисуем линии сетки (биты)
             using (Pen gridPen = new Pen(Color.FromArgb(80, 255, 255, 255), 1))
             {
                 gridPen.DashStyle = System.Drawing.Drawing2D.DashStyle.Dot;
@@ -315,8 +380,7 @@ namespace LooperStudio
                 }
             }
 
-            // Рисуем линии тактов (bars - 4 бита)
-            double barSize = (60.0 / project.BPM) * 4; // 4 четверти = 1 такт
+            double barSize = (60.0 / project.BPM) * 4;
             double barPixels = barSize * PixelsPerSecond;
 
             if (barPixels >= 10)
@@ -361,21 +425,19 @@ namespace LooperStudio
             g.FillRectangle(new SolidBrush(sampleColor), x, y, width, height);
             g.DrawRectangle(new Pen(Color.White, isSelected ? 2 : 1), x, y, width, height);
 
-            // Рисуем индикатор громкости (зелёная/жёлтая/красная полоска)
             int volumeBarHeight = 4;
             int volumeBarWidth = (int)(width * Math.Min(1.0f, sample.Volume));
             Color volumeColor;
 
             if (sample.Volume <= 1.0f)
-                volumeColor = Color.FromArgb(100, 255, 100); // Зелёный - нормальная громкость
+                volumeColor = Color.FromArgb(100, 255, 100);
             else if (sample.Volume <= 1.5f)
-                volumeColor = Color.FromArgb(255, 200, 0); // Жёлтый - повышенная громкость
+                volumeColor = Color.FromArgb(255, 200, 0);
             else
-                volumeColor = Color.FromArgb(255, 50, 50); // Красный - опасная громкость
+                volumeColor = Color.FromArgb(255, 50, 50);
 
             g.FillRectangle(new SolidBrush(volumeColor), x, y + height - volumeBarHeight, volumeBarWidth, volumeBarHeight);
 
-            // Рисуем индикаторы для изменения размера
             if (isSelected)
             {
                 g.FillRectangle(Brushes.Yellow, x, y, EdgeGrabWidth, height);
@@ -397,7 +459,6 @@ namespace LooperStudio
 
             using (Font font = new Font("Segoe UI", 7, FontStyle.Bold))
             {
-                // Цвет текста громкости зависит от уровня
                 Brush volumeBrush = sample.Volume > 1.0f ? Brushes.Yellow : Brushes.LightGray;
                 string volumeText = $"Громк.: {(int)(sample.Volume * 100)}%";
 
@@ -412,6 +473,14 @@ namespace LooperStudio
         {
             if (e.Button == MouseButtons.Left)
             {
+                // Проверяем клик по курсору воспроизведения
+                if (IsClickOnPlayhead(e.Location))
+                {
+                    isDraggingPlayhead = true;
+                    Cursor = Cursors.SizeWE;
+                    return;
+                }
+
                 // Проверяем клик по кнопке "Add Track"
                 int addButtonY = TimelineHeaderHeight + (project.TrackCount * TrackHeight) + 10;
                 Rectangle addButtonRect = new Rectangle(20, addButtonY, 150, 40);
@@ -424,7 +493,17 @@ namespace LooperStudio
                     return;
                 }
 
-                // Проверяем, не кликнули ли по краю семпла для изменения размера
+                // Проверяем клик по заголовку таймлайна для перемотки
+                if (e.Y < TimelineHeaderHeight)
+                {
+                    double newPosition = e.X / PixelsPerSecond;
+                    playbackPosition = Math.Max(0, newPosition);
+                    PlayheadMoved?.Invoke(this, playbackPosition);
+                    isDraggingPlayhead = true;
+                    Invalidate();
+                    return;
+                }
+
                 var (sample, edge) = GetSampleEdgeAtPoint(e.Location);
                 if (sample != null && (selectedSamples.Contains(sample) || sample == selectedSample))
                 {
@@ -442,7 +521,6 @@ namespace LooperStudio
 
                 if (clickedSample != null)
                 {
-                    // Ctrl - добавляем к выделению
                     if (ModifierKeys.HasFlag(Keys.Control))
                     {
                         if (selectedSamples.Contains(clickedSample))
@@ -456,7 +534,6 @@ namespace LooperStudio
                     }
                     else if (!selectedSamples.Contains(clickedSample))
                     {
-                        // Кликнули по невыделенному семплу - выделяем только его
                         selectedSamples.Clear();
                         selectedSamples.Add(clickedSample);
                     }
@@ -465,7 +542,6 @@ namespace LooperStudio
                     isDragging = true;
                     dragStartPoint = e.Location;
 
-                    // Запоминаем начальные позиции всех выделенных семплов
                     groupDragStartPositions.Clear();
                     foreach (var s in selectedSamples)
                     {
@@ -477,12 +553,10 @@ namespace LooperStudio
                 }
                 else
                 {
-                    // Начинаем выделение рамкой
                     isSelecting = true;
                     selectionStartPoint = e.Location;
                     selectionRectangle = new Rectangle(e.Location, Size.Empty);
 
-                    // Если НЕ зажат Ctrl - очищаем выделение
                     if (!ModifierKeys.HasFlag(Keys.Control))
                     {
                         selectedSamples.Clear();
@@ -495,7 +569,16 @@ namespace LooperStudio
 
         private void TimelineControl_MouseMove(object sender, MouseEventArgs e)
         {
-            // Проверяем наведение на кнопку "Add Track"
+            // Перетаскивание курсора воспроизведения
+            if (isDraggingPlayhead)
+            {
+                double newPosition = Math.Max(0, e.X / PixelsPerSecond);
+                playbackPosition = newPosition;
+                PlayheadMoved?.Invoke(this, playbackPosition);
+                Invalidate();
+                return;
+            }
+
             int addButtonY = TimelineHeaderHeight + (project.TrackCount * TrackHeight) + 10;
             Rectangle addButtonRect = new Rectangle(20, addButtonY, 150, 40);
 
@@ -505,19 +588,24 @@ namespace LooperStudio
             }
             else if (!isResizing && !isDragging)
             {
-                // Проверяем наведение на края семплов
-                var (sample, edge) = GetSampleEdgeAtPoint(e.Location);
-                if (sample != null && (selectedSamples.Contains(sample) || sample == selectedSample))
+                if (IsClickOnPlayhead(e.Location))
                 {
-                    Cursor = Cursors.SizeWE;
+                    Cursor = Cursors.Hand;
                 }
                 else
                 {
-                    Cursor = Cursors.Default;
+                    var (sample, edge) = GetSampleEdgeAtPoint(e.Location);
+                    if (sample != null && (selectedSamples.Contains(sample) || sample == selectedSample))
+                    {
+                        Cursor = Cursors.SizeWE;
+                    }
+                    else
+                    {
+                        Cursor = Cursors.Default;
+                    }
                 }
             }
 
-            // Изменение размера семпла
             if (isResizing && resizingSample != null)
             {
                 int deltaX = e.X - dragStartPoint.X;
@@ -525,10 +613,8 @@ namespace LooperStudio
 
                 if (resizingRightEdge)
                 {
-                    // Изменяем правый край - меняем Duration
                     double newDuration = originalDuration + deltaTime;
 
-                    // Получаем реальную длительность файла
                     try
                     {
                         using (var audioFile = new AudioFileReader(resizingSample.FilePath))
@@ -543,7 +629,6 @@ namespace LooperStudio
                 }
                 else
                 {
-                    // Изменяем левый край - меняем FileOffset и StartTime
                     double newFileOffset = originalFileOffset + deltaTime;
 
                     if (newFileOffset >= 0)
@@ -569,7 +654,6 @@ namespace LooperStudio
                 return;
             }
 
-            // Выделение рамкой
             if (isSelecting)
             {
                 int x = Math.Min(selectionStartPoint.X, e.X);
@@ -579,7 +663,6 @@ namespace LooperStudio
 
                 selectionRectangle = new Rectangle(x, y, width, height);
 
-                // Обновляем выделение
                 var samplesInRect = GetSamplesInRectangle(selectionRectangle);
                 if (!ModifierKeys.HasFlag(Keys.Control))
                 {
@@ -597,7 +680,6 @@ namespace LooperStudio
                 return;
             }
 
-            // Перетаскивание семплов
             if (isDragging && selectedSamples.Count > 0)
             {
                 int totalDeltaX = e.X - dragStartPoint.X;
@@ -637,15 +719,19 @@ namespace LooperStudio
 
         private void TimelineControl_MouseUp(object sender, MouseEventArgs e)
         {
-            // Если это был простой клик (не перетаскивание) по пустому месту
+            if (isDraggingPlayhead)
+            {
+                isDraggingPlayhead = false;
+                Cursor = Cursors.Default;
+                return;
+            }
+
             if (isSelecting && !ModifierKeys.HasFlag(Keys.Control))
             {
-                // Проверяем, было ли реальное перетаскивание
                 int dragDistance = Math.Abs(e.X - selectionStartPoint.X) + Math.Abs(e.Y - selectionStartPoint.Y);
 
-                if (dragDistance < 5) // Если движение меньше 5 пикселей - это клик, а не drag
+                if (dragDistance < 5)
                 {
-                    // Простой клик по пустому месту - снимаем выделение
                     selectedSamples.Clear();
                     selectedSample = null;
                 }
@@ -656,7 +742,6 @@ namespace LooperStudio
             resizingSample = null;
             Cursor = Cursors.Default;
 
-            // Завершаем выделение рамкой
             if (isSelecting)
             {
                 isSelecting = false;
@@ -675,18 +760,15 @@ namespace LooperStudio
 
         private void TimelineControl_MouseWheel(object sender, MouseEventArgs e)
         {
-            // Ctrl + колёсико = регулировка громкости
             if (ModifierKeys.HasFlag(Keys.Control))
             {
                 AudioSample hoveredSample = GetSampleAtPoint(e.Location);
 
                 if (hoveredSample != null)
                 {
-                    // Изменяем громкость
                     float volumeChange = e.Delta > 0 ? 0.05f : -0.05f;
                     hoveredSample.Volume = Math.Max(0.0f, Math.Min(2.0f, hoveredSample.Volume + volumeChange));
 
-                    // Если семпл не выделен, выделяем его для визуальной обратной связи
                     if (!selectedSamples.Contains(hoveredSample))
                     {
                         selectedSamples.Clear();
@@ -695,19 +777,15 @@ namespace LooperStudio
                     }
 
                     Invalidate();
-
-                    // Показываем временное сообщение с громкостью
                     ShowVolumeTooltip(hoveredSample, e.Location);
                 }
 
-                // ВАЖНО: Предотвращаем прокрутку таймлайна
                 ((HandledMouseEventArgs)e).Handled = true;
             }
         }
 
         private void ShowVolumeTooltip(AudioSample sample, Point location)
         {
-            // Создаём временную подсказку
             var tooltip = new ToolTip();
             tooltip.IsBalloon = false;
             tooltip.UseAnimation = true;
